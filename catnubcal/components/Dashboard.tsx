@@ -1,0 +1,1347 @@
+
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+    LayoutDashboard,
+    BarChart2,
+    Settings,
+    Camera,
+    ChevronLeft,
+    ChevronRight,
+    Trash2,
+    Bookmark,
+    X,
+    History,
+    Activity,
+    Sparkles,
+    UtensilsCrossed,
+    ClipboardList,
+    Flame,
+    Droplet,
+    Plus,
+    Image as ImageIcon,
+    Calendar,
+    Edit3,
+    Beef,
+    Wheat,
+    GlassWater
+} from 'lucide-react';
+import { FoodItem, UserStats, PetState } from '../types';
+import { INITIAL_USER_STATS, MOCK_DAILY_LOGS } from '../mockData';
+import { calculateHealthScore, determinePetState } from '../services/health-logic';
+import { analyzeFoodImage } from '../services/n8n-service';
+import PetSmartWalk from './PetSmartWalk';
+import WaterTracker from './WaterTracker';
+import MenuRoulette from './MenuRoulette';
+import Analytics from './Analytics';
+import MovingBackground from './MovingBackground';
+import { supabase } from '../services/supabaseClient';
+import { useAuth } from '../services/AuthContext';
+
+const Dashboard: React.FC = () => {
+    const { user, signOut } = useAuth();
+    const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'diary' | 'analytics'>('dashboard');
+    const [userStats, setUserStats] = useState<UserStats>(INITIAL_USER_STATS);
+    const [foodLog, setFoodLog] = useState<FoodItem[]>([]);
+    const [isScanning, setIsScanning] = useState(false);
+    const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [currentWater, setCurrentWater] = useState(0); // [NEW] Water state
+    const [currentWeight, setCurrentWeight] = useState<number | null>(null); // [NEW] Weight state
+    const [targetWeight, setTargetWeight] = useState<number | null>(null);
+    const [streak, setStreak] = useState(0); // [NEW] Streak State
+
+    const [showWeightModal, setShowWeightModal] = useState(false);
+    const [nutrientPage, setNutrientPage] = useState(0); // [NEW] Carousel page state (0 = Macros, 1 = Micros)
+
+    // Date Selection State - MOVED UP to fix ReferenceError
+    const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
+
+    // Generate 7 days centered around Today
+    const dateButtons = useMemo(() => {
+        const dates = [];
+        const today = new Date();
+        for (let i = -3; i <= 3; i++) {
+            const d = new Date();
+            d.setDate(today.getDate() + i);
+            dates.push({
+                full: d.toLocaleDateString('en-CA'),
+                dayName: d.toLocaleDateString('th-TH', { weekday: 'short' }),
+                dateNum: d.getDate(),
+                isToday: d.toLocaleDateString('en-CA') === today.toLocaleDateString('en-CA')
+            });
+        }
+        return dates;
+    }, []);
+
+    const manualFormRef = useRef<HTMLFormElement>(null);
+    const manualImageInputRef = useRef<HTMLInputElement>(null);
+
+    const openAddModal = () => setShowAddModal(true);
+
+
+
+    const handleWaterUpdate = async (newAmount: number) => {
+        setCurrentWater(newAmount); // Optimistic update
+        if (!user) return;
+
+        const dateStr = selectedDate;
+
+        // Save to Local Storage (Offline fallback)
+        const localKey = `water_${user.id}_${dateStr}`;
+        localStorage.setItem(localKey, newAmount.toString());
+
+        try {
+            const { error } = await supabase
+                .from('water_logs')
+                .upsert({ user_id: user.id, date: dateStr, amount: newAmount }, { onConflict: 'user_id,date' });
+
+            if (error) throw error;
+        } catch (err) {
+            console.error("Error saving water log:", err);
+        }
+    };
+    // Fetch User Profile from Supabase
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const userId = user?.id;
+                if (!userId) return;
+
+                let query = supabase.from('profiles').select('*').eq('id', userId);
+
+                const { data, error } = await query.maybeSingle();
+
+                if (data && data.daily_calorie_target) {
+                    console.log("Fetched Profile:", data);
+                    setUserStats(prev => ({
+                        ...prev,
+                        name: data.display_name || data.username || 'User',
+                        tdee: data.daily_calorie_target, // Set Target Limit
+                        proteinTarget: data.protein_target,
+                        carbsTarget: data.carbs_target,
+                        fatTarget: data.fat_target,
+                    }));
+                    // Set weight data
+                    if (data.current_weight) setCurrentWeight(data.current_weight);
+                    if (data.target_weight) setTargetWeight(data.target_weight);
+                }
+            } catch (e) {
+                console.error("Error fetching profile:", e);
+            }
+
+            // FALLBACK: Load from Local Storage if Supabase failed or returned no data
+            const offlineDataStr = localStorage.getItem('offline_profile');
+            if (offlineDataStr) {
+                try {
+                    const offlineData = JSON.parse(offlineDataStr);
+                    console.log("Using Offline Profile Data:", offlineData);
+                    setUserStats(prev => ({
+                        ...prev,
+                        name: offlineData.username || 'User',
+                        tdee: offlineData.daily_calorie_target,
+                        proteinTarget: offlineData.protein_target,
+                        carbsTarget: offlineData.carbs_target,
+                        fatTarget: offlineData.fat_target,
+                    }));
+                } catch (err) {
+                    console.error("Error parsing offline data", err);
+                }
+            }
+        };
+        fetchProfile();
+    }, [user]);
+
+    // [NEW] Fetch Water Log for Selected Date
+    useEffect(() => {
+        const fetchWaterLog = async () => {
+            if (!user) return;
+            // Ensure selectedDate is a valid Date object or string
+            const dateStr = selectedDate;
+            try {
+                const { data, error } = await supabase
+                    .from('water_logs')
+                    .select('amount')
+                    .eq('user_id', user.id)
+                    .eq('date', dateStr)
+                    .maybeSingle();
+
+                if (error) throw error;
+                setCurrentWater(data?.amount || 0);
+            } catch (err) {
+                console.warn("Error fetching water log:", err);
+                // Fallback to local storage if needed (optional, but requested persistence was DB)
+                const localKey = `water_${user.id}_${dateStr}`;
+                const saved = localStorage.getItem(localKey);
+                if (saved) setCurrentWater(parseInt(saved));
+                else setCurrentWater(0);
+            }
+        };
+        fetchWaterLog();
+    }, [selectedDate, user]);
+
+    // [NEW] Calculate Streak (Consecutive Active Days)
+    useEffect(() => {
+        const calculateStreak = async () => {
+            if (!user) return;
+
+            // Fetch recent logs to calculate streak (e.g. last 60 days)
+            const { data, error } = await supabase
+                .from('food_logs')
+                .select('created_at')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(100);
+
+            if (data) {
+                // 1. Get unique unique YYYY-MM-DD
+                const uniqueDays = new Set(
+                    data.map(log => new Date(log.created_at).toLocaleDateString('en-CA')) // YYYY-MM-DD in local time
+                );
+
+                // 2. Check backwards from today
+                const today = new Date();
+                const todayStr = today.toLocaleDateString('en-CA');
+
+                const yesterday = new Date();
+                yesterday.setDate(today.getDate() - 1);
+                const yesterdayStr = yesterday.toLocaleDateString('en-CA');
+
+                let currentStreak = 0;
+                let checkDate = new Date();
+
+                // If today is logged, we start counting from today. 
+                // If today NOT logged, but Yesterday IS, we start counting from Yesterday (streak active but not updated today yet).
+                // If neither, streak broken (0).
+
+                if (uniqueDays.has(todayStr)) {
+                    currentStreak = 1;
+                    checkDate.setDate(checkDate.getDate() - 1); // Start checking previous days
+                } else if (uniqueDays.has(yesterdayStr)) {
+                    // Streak implies consecutive days ENDING now. 
+                    // Common logic: if yesterday was logged, streak is alive.
+                    currentStreak = 0; // Will be incremented in loop below starting from yesterday
+                    checkDate.setDate(checkDate.getDate() - 1);
+                } else {
+                    setStreak(0);
+                    return;
+                }
+
+                // Count backwards
+                while (true) {
+                    const dateStr = checkDate.toLocaleDateString('en-CA');
+                    if (uniqueDays.has(dateStr)) {
+                        currentStreak++;
+                        checkDate.setDate(checkDate.getDate() - 1);
+                    } else {
+                        break;
+                    }
+                }
+                setStreak(currentStreak);
+            }
+        };
+        calculateStreak();
+    }, [user, foodLog]); // Re-calc when foodLog updates (e.g. adding new food)
+
+
+
+
+    // Fetch Food Logs for selected date
+    useEffect(() => {
+        const fetchFoodLogs = async () => {
+            const userId = user?.id;
+            if (!userId) return;
+
+            const startOfDay = new Date(selectedDate);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(selectedDate);
+            endOfDay.setHours(23, 59, 59, 999);
+
+            const { data, error } = await supabase
+                .from('food_logs')
+                .select('*')
+                .eq('user_id', userId)
+                .gte('created_at', startOfDay.toISOString())
+                .lte('created_at', endOfDay.toISOString());
+
+            if (data && data.length > 0) {
+                const formattedLogs: FoodItem[] = data.map(item => ({
+                    id: item.id,
+                    name: item.food_name,
+                    calories: item.calories,
+                    protein: item.protein,
+                    carbs: item.carbs,
+                    fat: item.fat,
+                    timestamp: new Date(item.created_at).getTime(),
+                    meal: item.meal_type || 'Snack',
+                    imageUrl: item.image_url || undefined,
+                    fiber: 0,
+                    sugar: item.sugar || 0,
+                    sodium: item.sodium || 0,
+                    cholesterol: item.cholesterol || 0,
+                    servingSize: { unit: 'serving', quantity: 1 }
+                }));
+                setFoodLog(formattedLogs);
+            } else {
+                // FALLBACK: Load from LocalStorage
+                const offlineLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
+                const startOfDay = new Date(selectedDate); startOfDay.setHours(0, 0, 0, 0);
+                const endOfDay = new Date(selectedDate); endOfDay.setHours(23, 59, 59, 999);
+
+                const filteredLogs = offlineLogs.filter((item: any) => {
+                    const itemDate = new Date(item.created_at);
+                    return itemDate >= startOfDay && itemDate <= endOfDay;
+                });
+
+                const formattedLogs: FoodItem[] = filteredLogs.map((item: any) => ({
+                    id: item.id,
+                    name: item.name,
+                    calories: item.calories,
+                    protein: item.protein,
+                    carbs: item.carbs,
+                    fat: item.fat,
+                    timestamp: new Date(item.created_at).getTime(),
+                    meal: item.meal_type || 'Snack',
+                    imageUrl: item.image_url || undefined,
+                    fiber: 0,
+                    sugar: 0,
+                    sodium: 0,
+                    cholesterol: 0,
+                    servingSize: { unit: 'serving', quantity: 1 }
+                }));
+                setFoodLog(formattedLogs);
+            }
+        };
+        fetchFoodLogs();
+    }, [selectedDate]);
+
+    // Calculate Stats from Real Data (No Mocks)
+    const currentDayStats = useMemo(() => {
+        return foodLog.reduce((acc, curr) => ({
+            calories: acc.calories + curr.calories,
+            protein: acc.protein + curr.protein,
+            carbs: acc.carbs + curr.carbs,
+            fat: acc.fat + curr.fat,
+            cholesterol: acc.cholesterol + (curr.cholesterol || 0),
+            sugar: acc.sugar + (curr.sugar || 0),
+            sodium: acc.sodium + (curr.sodium || 0),
+            score: acc.score + 10 // Simplified score logic
+        }), { calories: 0, protein: 0, carbs: 0, fat: 0, cholesterol: 0, sugar: 0, sodium: 0, score: 0 });
+    }, [foodLog]);
+
+    // Sync pet state
+    const petState = useMemo(() => {
+        return determinePetState(currentDayStats.calories, userStats.tdee, 80);
+    }, [currentDayStats, userStats.tdee]);
+
+    const remainingCalories = userStats.tdee - currentDayStats.calories;
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Read image as base64 and wait for it to complete
+        const readImageAsBase64 = (file: File): Promise<string> => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        };
+
+        setIsScanning(true);
+        try {
+            // Wait for image to be read first
+            const capturedImage = await readImageAsBase64(file);
+            setPreviewImage(capturedImage); // Show preview
+
+            const result = await analyzeFoodImage(file);
+            const userId = user?.id;
+
+            // Use selected date
+            const logDate = new Date(selectedDate);
+            logDate.setHours(12, 0, 0, 0);
+
+            // Save to DB
+            if (userId) {
+                const { data, error } = await supabase.from('food_logs').insert([{
+                    user_id: userId,
+                    food_name: result.name || 'AI Analysis',
+                    calories: result.calories || 0,
+                    protein: result.protein || 0,
+                    carbs: result.carbs || 0,
+                    fat: result.fat || 0,
+                    sugar: result.sugar || 0,
+                    sodium: result.sodium || 0,
+                    cholesterol: result.cholesterol || 0,
+                    image_url: capturedImage,
+                    created_at: logDate.toISOString()
+                }]).select().single();
+
+                if (error) {
+                    throw new Error(error.message);
+                }
+
+                if (data) {
+                    const newFood: FoodItem = {
+                        id: data.id,
+                        name: data.food_name,
+                        calories: data.calories,
+                        protein: data.protein,
+                        carbs: data.carbs,
+                        fat: data.fat,
+                        timestamp: new Date(data.created_at).getTime(),
+                        meal: 'ของว่าง',
+                        imageUrl: capturedImage,
+                        fiber: 0,
+                        sugar: data.sugar || 0,
+                        sodium: data.sodium || 0,
+                        cholesterol: data.cholesterol || 0,
+                        servingSize: { unit: 'serving', quantity: 1 }
+                    };
+                    setFoodLog(prev => [...prev, newFood]);
+                    setSelectedFood(newFood);
+                }
+            }
+            setShowAddModal(false);
+            setPreviewImage(null); // Clear preview after success
+        } catch (err: any) {
+            console.error("AI Scan DB Error:", err);
+
+            // FALLBACK: Save to LocalStorage
+            const userId = user?.id;
+            const logDate = new Date(selectedDate);
+            logDate.setHours(12, 0, 0, 0);
+
+            const offlineEntry = {
+                id: crypto.randomUUID(),
+                user_id: userId,
+                name: 'AI Scan Item',
+                calories: 0, // Set defaults as result might have failed too
+                protein: 0,
+                carbs: 0,
+                fat: 0,
+                meal_type: 'AI Scan',
+                created_at: logDate.toISOString()
+            };
+
+            const offlineLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
+            offlineLogs.push(offlineEntry);
+            localStorage.setItem('offline_food_logs', JSON.stringify(offlineLogs));
+
+            const newFood: FoodItem = {
+                id: offlineEntry.id,
+                name: offlineEntry.name,
+                calories: offlineEntry.calories,
+                protein: offlineEntry.protein,
+                carbs: offlineEntry.carbs,
+                fat: offlineEntry.fat,
+                fiber: 0,
+                sugar: 0,
+                sodium: 0,
+                cholesterol: 0,
+                meal: 'ของว่าง',
+                timestamp: new Date(offlineEntry.created_at).getTime(),
+                servingSize: { unit: 'portion', quantity: 1 },
+            };
+            setFoodLog(prev => [...prev, newFood]);
+        } finally {
+            setIsScanning(false);
+        }
+    };
+
+    const handleManualImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onloadend = () => setPreviewImage(reader.result as string);
+        reader.readAsDataURL(file);
+    };
+
+    const handleManualSubmit = async (e: any) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const userId = user?.id;
+
+        if (!userId) return;
+
+        // Use selected date for the log, set to Noon to be safe
+        const logDate = new Date(selectedDate);
+        logDate.setHours(12, 0, 0, 0);
+
+        const newEntry = {
+            user_id: userId,
+            food_name: fd.get('name') as string,
+            calories: Number(fd.get('calories')),
+            protein: Number(fd.get('protein')) || 0,
+            carbs: Number(fd.get('carbs')) || 0,
+            fat: Number(fd.get('fat')) || 0,
+            cholesterol: Number(fd.get('cholesterol')) || 0,
+            sugar: Number(fd.get('sugar')) || 0,
+            sodium: Number(fd.get('sodium')) || 0,
+            image_url: previewImage,
+            created_at: logDate.toISOString()
+        };
+
+        const { data, error } = await supabase.from('food_logs').insert([newEntry]).select().single();
+
+        if (error) {
+            console.error("Error saving food log:", error);
+
+            // FALLBACK: Save to LocalStorage
+            const offlineLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
+            const offlineEntry = { ...newEntry, id: crypto.randomUUID() };
+            offlineLogs.push(offlineEntry);
+            localStorage.setItem('offline_food_logs', JSON.stringify(offlineLogs));
+
+            console.log("Saved food log to Offline Storage");
+
+            // Still update UI with the offline entry
+            const newFood: FoodItem = {
+                id: offlineEntry.id,
+                name: offlineEntry.food_name,
+                calories: offlineEntry.calories,
+                protein: offlineEntry.protein,
+                carbs: offlineEntry.carbs,
+                fat: offlineEntry.fat,
+                fiber: 0,
+                sugar: 0,
+                sodium: 0,
+                cholesterol: 0,
+                meal: 'ของว่าง',
+                timestamp: new Date(offlineEntry.created_at).getTime(),
+                servingSize: { unit: 'portion', quantity: 1 },
+                imageUrl: offlineEntry.image_url,
+            };
+            setFoodLog(prev => [...prev, newFood]);
+            setShowAddModal(false);
+            manualFormRef.current?.reset();
+            setPreviewImage(null);
+            return;
+        }
+
+        if (data) {
+            const newFood: FoodItem = {
+                id: data.id,
+                name: data.food_name,
+                calories: data.calories,
+                protein: data.protein,
+                carbs: data.carbs,
+                fat: data.fat,
+                timestamp: new Date(data.created_at).getTime(),
+                meal: 'ของว่าง',
+                imageUrl: data.image_url || previewImage,
+                fiber: 0,
+                sugar: data.sugar || 0,
+                sodium: data.sodium || 0,
+                cholesterol: data.cholesterol || 0,
+                servingSize: { unit: 'serving', quantity: 1 }
+            };
+            setFoodLog(prev => [...prev, newFood]);
+        }
+
+        setShowAddModal(false);
+        setPreviewImage(null);
+    };
+
+    // [NEW] Portion Control State
+    const [portion, setPortion] = useState(1); // 1.0 = 100%
+    const [baseStats, setBaseStats] = useState<FoodItem | null>(null);
+
+    // Initialize Base Stats when opening Selected Food
+    useEffect(() => {
+        if (selectedFood) {
+            setBaseStats(selectedFood);
+            setPortion(1);
+        }
+    }, [selectedFood]);
+
+    // Update DB with new portion
+    const handleUpdatePortion = async () => {
+        if (!selectedFood || !baseStats || portion === 1) {
+            setSelectedFood(null); // Just close if no change
+            return;
+        }
+
+        const userId = user?.id;
+        const newCalories = Math.round(baseStats.calories * portion);
+        const newProtein = Number((baseStats.protein * portion).toFixed(1));
+        const newCarbs = Number((baseStats.carbs * portion).toFixed(1));
+        const newFat = Number((baseStats.fat * portion).toFixed(1));
+        const newChol = Math.round(baseStats.cholesterol * portion);
+        const newSugar = Number((baseStats.sugar * portion).toFixed(1));
+        const newSodium = Math.round(baseStats.sodium * portion);
+
+        const updatedFields = {
+            calories: newCalories,
+            protein: newProtein,
+            carbs: newCarbs,
+            fat: newFat,
+            cholesterol: newChol,
+            sugar: newSugar,
+            sodium: newSodium
+        };
+
+        if (userId) {
+            const { error } = await supabase
+                .from('food_logs')
+                .update(updatedFields)
+                .eq('id', selectedFood.id);
+
+            if (error) {
+                console.error("Update failed, trying offline", error);
+                // Offline fallback logic below
+            }
+        }
+
+        // Update Local Storage (Offline Mirror)
+        try {
+            const offlineLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
+            const logIndex = offlineLogs.findIndex((l: any) => l.id === selectedFood.id);
+            if (logIndex >= 0) {
+                offlineLogs[logIndex] = { ...offlineLogs[logIndex], ...updatedFields };
+                localStorage.setItem('offline_food_logs', JSON.stringify(offlineLogs));
+            }
+        } catch (e) {
+            console.error("Error updating offline logs", e);
+        }
+
+        // Update UI
+        const updatedFood = {
+            ...selectedFood,
+            ...updatedFields
+        };
+
+        setFoodLog(prev => prev.map(f => f.id === selectedFood.id ? updatedFood : f));
+        setSelectedFood(null); // Close modal
+    };
+
+    // Calculate display values based on portion
+    const displayFood = useMemo(() => {
+        if (!baseStats) return selectedFood;
+        return {
+            ...baseStats,
+            calories: Math.round(baseStats.calories * portion),
+            protein: Number((baseStats.protein * portion).toFixed(1)),
+            carbs: Number((baseStats.carbs * portion).toFixed(1)),
+            fat: Number((baseStats.fat * portion).toFixed(1)),
+            cholesterol: Math.round(baseStats.cholesterol * portion),
+            sugar: Number((baseStats.sugar * portion).toFixed(1)),
+            sodium: Math.round(baseStats.sodium * portion),
+        };
+    }, [baseStats, portion, selectedFood]);
+
+    // Delete Food Item from Database/Offline Storage
+    const handleDeleteFood = async (foodId: string) => {
+        const userId = user?.id;
+
+        // Try to delete from Supabase
+        if (userId) {
+            const { error } = await supabase
+                .from('food_logs')
+                .delete()
+                .eq('id', foodId)
+                .eq('user_id', userId);
+
+            if (error) {
+                console.log("DB delete failed, trying offline storage:", error);
+            }
+        }
+
+        // Also delete from offline storage (in case it was saved there)
+        const offlineLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
+        const updatedLogs = offlineLogs.filter((item: any) => item.id !== foodId);
+        localStorage.setItem('offline_food_logs', JSON.stringify(updatedLogs));
+
+        // Update UI state
+        setFoodLog(prev => prev.filter(f => f.id !== foodId));
+        setSelectedFood(null);
+    };
+
+    return (
+        <div className="max-w-md mx-auto min-h-screen relative pb-32 overflow-x-hidden">
+            {/* Seamless Moving Cat Pattern */}
+            <MovingBackground />
+
+            {/* Enhanced Header - Premium Glass Theme */}
+            <header className={`px-6 pt-10 pb-6 bg-white/30 backdrop-blur-xl rounded-b-[3.5rem] shadow-[0_20px_60px_-15px_rgba(232,141,103,0.15)] border-b border-white/60 ${activeTab === 'analytics' ? 'hidden' : ''}`}>
+
+                {/* Top Row: Greeting + Progress Ring + Settings */}
+                {/* Top Row: Greeting + Progress Ring + Settings - Unified Glass Card */}
+                <div className="bg-gradient-to-br from-white/80 via-white/50 to-orange-100/30 backdrop-blur-xl rounded-[2rem] p-5 border border-white/60 shadow-[0_8px_32px_rgba(255,100,100,0.1)] mb-5 relative overflow-hidden group hover:shadow-[0_10px_40px_rgba(255,100,100,0.15)] transition-all duration-500">
+
+                    <div className="flex justify-between items-start relative z-10">
+                        {/* Left Side: Greeting & Calorie Status */}
+                        <div className="flex-1">
+                            {/* Greeting Badge */}
+                            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-50/80 to-rose-50/80 px-3 py-1.5 rounded-full mb-3 border border-white/60 backdrop-blur-sm">
+                                <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                                <span className="text-xs font-bold text-orange-600 tracking-wide">
+                                    {new Date().getHours() < 12 ? 'สวัสดีตอนเช้า ☀️' : new Date().getHours() < 18 ? 'สวัสดีตอนบ่าย 🌤️' : 'สวัสดีตอนเย็น 🌙'}
+                                </span>
+                            </div>
+
+                            {/* Name with Online Status */}
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="relative flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                                </span>
+                                <h1 className="font-header text-3xl font-bold leading-tight uppercase tracking-[0.15em] text-slate-700/90 drop-shadow-sm">
+                                    {userStats.name}
+                                    {remainingCalories > 0 && remainingCalories < 500 && <span className="ml-2 inline-block animate-bounce text-orange-500">🔥</span>}
+                                    {remainingCalories <= 0 && <span className="ml-2 inline-block animate-bounce">🎉</span>}
+                                </h1>
+                            </div>
+
+                            {/* Calorie Status */}
+                            <div className="flex items-center gap-2 text-sm">
+                                {remainingCalories > 0 ? (
+                                    <>
+                                        <span className="text-slate-500 font-medium">เหลืออีก</span>
+                                        <span className="font-header font-bold text-orange-500">{remainingCalories}</span>
+                                        <span className="text-slate-500 font-medium">kcal</span>
+                                    </>
+                                ) : (
+                                    <span className="font-bold text-green-500 flex items-center gap-2">
+                                        ✨ ทำได้สำเร็จวันนี้!
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Right Side: Progress Ring & Settings */}
+                        <div className="flex flex-col items-end gap-3">
+                            <div className="flex items-center gap-2">
+                                {/* Progress Ring */}
+                                <div className="relative w-12 h-12">
+                                    <svg className="w-full h-full -rotate-90 drop-shadow-sm">
+                                        <circle cx="24" cy="24" r="20" fill="transparent" stroke="rgba(255,255,255,0.5)" strokeWidth="4" />
+                                        <circle
+                                            cx="24" cy="24" r="20" fill="transparent" stroke="url(#progressGradient)" strokeWidth="4"
+                                            strokeDasharray={126}
+                                            strokeDashoffset={126 - (126 * Math.min(1, currentDayStats.calories / userStats.tdee))}
+                                            strokeLinecap="round"
+                                            className="transition-all duration-700"
+                                        />
+                                        <defs>
+                                            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                <stop offset="0%" stopColor="#FB923C" />
+                                                <stop offset="100%" stopColor="#F472B6" />
+                                            </linearGradient>
+                                        </defs>
+                                    </svg>
+                                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-600/80">
+                                        {Math.round((currentDayStats.calories / userStats.tdee) * 100)}%
+                                    </span>
+                                </div>
+
+                                {/* Settings Button */}
+                                <button onClick={() => navigate('/profile')} className="w-10 h-10 bg-white/40 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/60 text-slate-400 hover:text-rose-500 hover:bg-white/60 hover:border-rose-200 transition-all shadow-sm">
+                                    <Settings className="w-4 h-4" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Streak + Weight Journey Row */}
+                <div className="flex gap-3 mb-5">
+                    {/* Streak Counter - Glass Gradient */}
+                    <div className="flex-[1.5] bg-gradient-to-br from-orange-400/90 to-rose-400/90 backdrop-blur-sm p-4 rounded-[2rem] flex items-center gap-3 shadow-[0_10px_30px_rgba(244,63,94,0.2)] border border-white/20">
+                        <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-md border border-white/30">
+                            <span className="text-2xl drop-shadow-md">🔥</span>
+                        </div>
+                        <div>
+                            <p className="text-white/80 text-[10px] font-bold uppercase tracking-wider">Streak</p>
+                            <p className="font-header text-white text-2xl font-bold leading-none drop-shadow-sm">{streak} วัน</p>
+                        </div>
+                    </div>
+
+                    {/* Weight Journey - Motivation Mode */}
+                    <div className="flex-1 bg-white/40 backdrop-blur-md p-3 rounded-[2rem] flex flex-col justify-center pl-5 border border-white/60 shadow-sm relative overflow-hidden group">
+                        <div className="relative z-10">
+                            <p className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                                {currentWeight && targetWeight ? (
+                                    currentWeight > targetWeight
+                                        ? `เป้าหมาย: ลด ${(currentWeight - targetWeight).toFixed(1)} kg`
+                                        : `เป้าหมาย: เพิ่ม ${(targetWeight - currentWeight).toFixed(1)} kg`
+                                ) : 'เป้าหมาย'}
+                            </p>
+                            <div className="flex items-baseline gap-1">
+                                <span className="font-header text-cyan-700 text-2xl font-black tracking-tight">{currentWeight ?? '--'}</span>
+                                {targetWeight && (
+                                    <span className="text-cyan-400 text-xs font-bold">/ {targetWeight}</span>
+                                )}
+                            </div>
+                        </div>
+                        {/* Subtle decorative background */}
+                        <Activity className="absolute -right-2 -bottom-2 w-16 h-16 text-cyan-100/50 -rotate-12 group-hover:scale-110 transition-transform" />
+                    </div>
+                </div>
+
+                {/* Date Calendar Strip - Glass */}
+                <div className="bg-white/40 backdrop-blur-xl p-5 rounded-[2rem] border border-white/60 shadow-[0_10px_40px_-5px_rgba(0,0,0,0.03)]">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-rose-400" />
+                            <span className="font-header text-sm font-medium text-slate-600">
+                                {new Date(selectedDate).toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })}
+                            </span>
+                        </div>
+                        <span className="text-xs font-semibold text-rose-500 bg-rose-50/50 px-3 py-1.5 rounded-full border border-rose-100/50">
+                            {selectedDate === new Date().toLocaleDateString('en-CA') ? '📍 วันนี้' : new Date(selectedDate).toLocaleDateString('th-TH', { weekday: 'long' })}
+                        </span>
+                    </div>
+                    <div className="flex justify-between items-center gap-1.5">
+                        {dateButtons.map((d) => {
+                            const isSelected = selectedDate === d.full;
+                            return (
+                                <button key={d.full} onClick={() => setSelectedDate(d.full)}
+                                    className={`flex flex-col items-center justify-center flex-1 py-3 rounded-xl transition-all duration-300 relative group ${isSelected
+                                        ? 'bg-gradient-to-b from-orange-400 to-rose-400 text-white shadow-[0_8px_20px_rgba(244,63,94,0.3)] scale-110 z-10 border border-white/20'
+                                        : 'bg-white/30 text-slate-400 border border-transparent hover:border-rose-200 hover:bg-rose-50/30'}`}
+                                >
+                                    <span className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isSelected ? 'text-white/80' : 'text-slate-400 group-hover:text-rose-400'}`}>{d.dayName}</span>
+                                    <span className={`font-header text-base font-bold ${isSelected ? '' : 'group-hover:text-rose-400'}`}>{d.dateNum}</span>
+                                    {d.isToday && !isSelected && <div className="absolute -bottom-1 w-1.5 h-1.5 bg-rose-400 rounded-full animate-pulse" />}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </header>
+
+            <main className="px-6 py-10 space-y-10">
+                {activeTab === 'dashboard' && (
+                    <div className="space-y-10">
+                        <PetSmartWalk
+                            currentCalories={currentDayStats.calories}
+                            goalCalories={userStats.tdee}
+                        />
+
+                        {/* Nutrition Stats - Glass Design */}
+                        <div className="space-y-6">
+                            {/* Calorie Donut - Glass */}
+                            <div className="bg-white/40 backdrop-blur-xl p-6 rounded-[3rem] border border-white/60 shadow-[0_20px_50px_-10px_rgba(0,0,0,0.05)] flex flex-col items-center relative overflow-hidden">
+                                {/* Subtle background glow */}
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-orange-100/30 rounded-full blur-3xl -z-10 -translate-y-1/2 translate-x-1/2"></div>
+
+                                <div className="relative w-64 h-64 flex items-center justify-center mb-6">
+                                    <svg className="w-full h-full -rotate-90 drop-shadow-sm">
+                                        {/* Background Circle */}
+                                        <circle cx="128" cy="128" r="110" fill="transparent" stroke="rgba(255,255,255,0.4)" strokeWidth="24" />
+                                        {/* Progress Circle */}
+                                        <circle
+                                            cx="128" cy="128" r="110" fill="transparent" stroke="url(#donutGradient)" strokeWidth="24"
+                                            strokeDasharray={691}
+                                            strokeDashoffset={691 - (691 * Math.min(1, currentDayStats.calories / userStats.tdee))}
+                                            strokeLinecap="round"
+                                            className="transition-all duration-1000 ease-in-out"
+                                        />
+                                        <defs>
+                                            <linearGradient id="donutGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                <stop offset="0%" stopColor="#FB923C" />
+                                                <stop offset="100%" stopColor="#F472B6" />
+                                            </linearGradient>
+                                        </defs>
+                                    </svg>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                        <div className="flex flex-col items-center">
+                                            <div className="bg-orange-50/80 backdrop-blur-sm p-3 rounded-full mb-1 border border-orange-100">
+                                                <Flame className="w-6 h-6 text-orange-500 fill-orange-500" />
+                                            </div>
+                                            <span className="text-[12px] font-black text-slate-400 uppercase tracking-widest mb-1">Calories Remaining</span>
+                                            <span className={`text-5xl font-black text-slate-700 leading-none mb-1 drop-shadow-sm ${remainingCalories < 0 ? 'text-red-500' : ''}`}>
+                                                {remainingCalories}
+                                            </span>
+                                            <div className="flex items-center gap-2 mt-2 bg-white/50 px-4 py-1.5 rounded-full border border-white/40">
+                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">GOAL: {userStats.tdee}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Nutrient Carousel Container */}
+                                <div className="w-full relative">
+                                    <div className="overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar">
+                                        <div className="flex w-[200%]">
+                                            {/* Page 1: Macros */}
+                                            <div className="w-1/2 flex-shrink-0 snap-center px-1">
+                                                <div className="grid grid-cols-3 gap-4 w-full">
+                                                    {[
+                                                        { label: 'PROTEIN', val: currentDayStats.protein, target: userStats.proteinTarget, unit: 'g', color: '#06b6d4', bg: 'bg-cyan-50/50', ring: '#22d3ee', icon: <Beef className="w-5 h-5 text-cyan-600" /> },
+                                                        { label: 'CARBS', val: currentDayStats.carbs, target: userStats.carbsTarget, unit: 'g', color: '#f97316', bg: 'bg-orange-50/50', ring: '#fdba74', icon: <Wheat className="w-5 h-5 text-orange-500" /> },
+                                                        { label: 'FAT', val: currentDayStats.fat, target: userStats.fatTarget, unit: 'g', color: '#84cc16', bg: 'bg-lime-50/50', ring: '#a3e635', icon: <Droplet className="w-5 h-5 text-lime-600" /> }
+                                                    ].map(m => (
+                                                        <div key={m.label} className="bg-white/50 backdrop-blur-md p-4 rounded-[2.5rem] border border-white/60 flex flex-col items-center shadow-sm relative overflow-hidden group hover:bg-white/70 transition-colors">
+                                                            {/* Circular Progress */}
+                                                            <div className="relative w-24 h-24 mb-2 flex items-center justify-center">
+                                                                <svg className="w-full h-full -rotate-90">
+                                                                    <circle cx="48" cy="48" r="40" fill="transparent" stroke="rgba(255,255,255,0.5)" strokeWidth="8" />
+                                                                    <circle
+                                                                        cx="48" cy="48" r="40" fill="transparent" stroke={m.ring} strokeWidth="8"
+                                                                        strokeDasharray={251}
+                                                                        strokeDashoffset={251 - (251 * Math.min(1, m.val / (m.target || 1)))}
+                                                                        strokeLinecap="round"
+                                                                        className="transition-all duration-1000 ease-in-out"
+                                                                    />
+                                                                </svg>
+                                                                <div className={`absolute inset-0 m-auto w-12 h-12 ${m.bg} backdrop-blur-sm rounded-full flex items-center justify-center border border-white/50`}>
+                                                                    {m.icon}
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-center z-10">
+                                                                <div className="flex items-baseline justify-center gap-0.5">
+                                                                    <span className="text-xl font-black text-slate-700 leading-none">{m.val}</span>
+                                                                    <span className="text-[10px] font-medium text-slate-400">/{m.target}g</span>
+                                                                </div>
+                                                                <span className="text-[9px] font-black text-slate-400/80 uppercase tracking-widest mt-1 block group-hover:text-slate-500">{m.label}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Page 2: Micros (Cholesterol, Sugar, Sodium) */}
+                                            <div className="w-1/2 flex-shrink-0 snap-center px-1">
+                                                <div className="grid grid-cols-3 gap-4 w-full">
+                                                    {[
+                                                        { label: 'CHOLESTEROL', val: currentDayStats.cholesterol, unit: 'mg', limit: 300, bg: 'bg-yellow-50/50', ring: '#facc15', icon: '🍳' },
+                                                        { label: 'SUGAR', val: currentDayStats.sugar, unit: 'g', limit: 24, bg: 'bg-pink-50/50', ring: '#f472b6', icon: '🍬' },
+                                                        { label: 'SODIUM', val: currentDayStats.sodium, unit: 'mg', limit: 2300, bg: 'bg-purple-50/50', ring: '#c084fc', icon: '🧂' }
+                                                    ].map(m => (
+                                                        <div key={m.label} className="bg-white/50 backdrop-blur-md p-4 rounded-[2.5rem] border border-white/60 flex flex-col items-center shadow-sm relative overflow-hidden group hover:bg-white/70 transition-colors">
+                                                            {/* Circular Progress (No target displayed, just value) */}
+                                                            <div className="relative w-24 h-24 mb-2 flex items-center justify-center">
+                                                                <svg className="w-full h-full -rotate-90">
+                                                                    <circle cx="48" cy="48" r="40" fill="transparent" stroke="rgba(255,255,255,0.5)" strokeWidth="8" />
+                                                                    <circle
+                                                                        cx="48" cy="48" r="40" fill="transparent" stroke={m.ring} strokeWidth="8"
+                                                                        strokeDasharray={251}
+                                                                        strokeDashoffset={251 - (251 * Math.min(1, m.val / m.limit))}
+                                                                        strokeLinecap="round"
+                                                                        className="transition-all duration-1000 ease-in-out"
+                                                                    />
+                                                                </svg>
+                                                                <div className={`absolute inset-0 m-auto w-12 h-12 ${m.bg} backdrop-blur-sm rounded-full flex items-center justify-center border border-white/50 text-2xl`}>
+                                                                    {m.icon}
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-center z-10">
+                                                                <div className="flex items-baseline justify-center gap-0.5">
+                                                                    <span className="text-xl font-black text-slate-700 leading-none">{m.val}</span>
+                                                                    <span className="text-[10px] font-medium text-slate-400">/{m.limit}</span>
+                                                                </div>
+                                                                <span className="text-[9px] font-black text-slate-400/80 uppercase tracking-widest mt-1 block group-hover:text-slate-500">{m.label} ({m.unit})</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Dot Indicators */}
+                                    <div className="flex justify-center gap-2 mt-6">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300/50"></div>
+                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-300/50"></div>
+                                    </div>
+                                    <p className="text-center text-[9px] font-bold text-slate-300/60 uppercase tracking-widest mt-2">Swipe for details</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <WaterTracker current={currentWater} goal={userStats.waterGoal || 8} onUpdate={handleWaterUpdate} />
+                    </div>
+                )}
+
+                {activeTab === 'diary' && (
+                    <div className="space-y-8 pb-20">
+                        {/* Menu Roulette (Gamification) */}
+                        <MenuRoulette remainingCalories={remainingCalories} />
+
+                        <div className="bg-white p-8 rounded-[3rem] border border-[#F1EFE9] shadow-[0_20px_40px_rgba(0,0,0,0.02)] flex justify-between items-center">
+                            <div className="space-y-1">
+                                <h3 className="text-xl font-black text-slate-800">บันทึกอาหาร</h3>
+                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Food Log Progress</p>
+                            </div>
+                            <button onClick={openAddModal} className="bg-[#1A1C1E] text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl active:scale-90 transition-all">
+                                <Plus className="w-7 h-7" />
+                            </button>
+                        </div>
+
+
+
+                        <div className="space-y-6">
+                            {foodLog.length === 0 ? (
+                                <div className="py-24 flex flex-col items-center justify-center text-slate-200">
+                                    <UtensilsCrossed className="w-16 h-16 opacity-10 mb-4" />
+                                    <p className="text-xs font-black uppercase tracking-[0.2em]">ไม่มีรายการของวันที่เลือก</p>
+                                </div>
+                            ) : (
+                                foodLog.map((food) => (
+                                    <div key={food.id} onClick={() => setSelectedFood(food)} className="bg-white p-5 rounded-[2.8rem] border border-[#F1EFE9] shadow-[0_8px_30px_rgba(0,0,0,0.02)] flex flex-col gap-4 cursor-pointer active:scale-[0.98] transition-all hover:border-[#E88D67]/30">
+                                        <div className="flex items-center gap-5">
+                                            <div className="w-24 h-24 bg-[#FAF8F6] rounded-[2rem] flex items-center justify-center text-2xl border border-slate-100 overflow-hidden shadow-inner flex-shrink-0">
+                                                {food.imageUrl ? <img src={food.imageUrl} className="w-full h-full object-cover" alt={food.name} /> : <div className="text-slate-200"><UtensilsCrossed className="w-8 h-8" /></div>}
+                                            </div>
+                                            <div className="flex-1 space-y-2">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <span className="text-[9px] font-black text-[#E88D67] uppercase tracking-[0.15em] block mb-1">{food.meal}</span>
+                                                        <h4 className="font-black text-slate-800 text-base leading-tight">{food.name}</h4>
+                                                    </div>
+                                                    <ChevronRight className="w-5 h-5 text-slate-200" />
+                                                </div>
+                                                <div className="flex items-baseline gap-1">
+                                                    <span className="text-xl font-black text-slate-800">{food.calories}</span>
+                                                    <span className="text-[10px] font-bold text-slate-300 uppercase">kcal</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 px-1">
+                                            {[
+                                                { label: 'P', val: food.protein, color: 'bg-cyan-50 border-cyan-200', icon: '🥩' },
+                                                { label: 'C', val: food.carbs, color: 'bg-amber-50 border-amber-200', icon: '🌾' },
+                                                { label: 'F', val: food.fat, color: 'bg-lime-50 border-lime-200', icon: '💧' }
+                                            ].map(m => (
+                                                <div key={m.label} className={`${m.color} rounded-2xl py-2 px-2 flex items-center justify-center gap-1.5 border`}>
+                                                    <span className="text-sm">{m.icon}</span>
+                                                    <span className="text-[10px] font-black text-slate-700">{m.val}g</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'analytics' && <Analytics />}
+            </main>
+
+            {/* Navigation Bar */}
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-sm z-50">
+                <div className="bg-white/80 backdrop-blur-2xl py-4 px-6 rounded-[2.8rem] shadow-[0_25px_60px_rgba(0,0,0,0.08)] flex justify-between items-end border border-white/90">
+                    <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center gap-1.5 transition-all w-16 ${activeTab === 'dashboard' ? 'text-[#E88D67]' : 'text-slate-300'}`}>
+                        <LayoutDashboard className={`w-6 h-6 ${activeTab === 'dashboard' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                        <span className="text-[9px] font-black uppercase tracking-widest">HOME</span>
+                    </button>
+                    <button onClick={() => setActiveTab('diary')} className={`flex flex-col items-center gap-1.5 transition-all w-16 ${activeTab === 'diary' ? 'text-[#E88D67]' : 'text-slate-300'}`}>
+                        <ClipboardList className={`w-6 h-6 ${activeTab === 'diary' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                        <span className="text-[9px] font-black uppercase tracking-widest">DIARY</span>
+                    </button>
+                    <div className="relative -top-6">
+                        <button onClick={openAddModal} className="w-16 h-16 bg-gradient-to-br from-[#E88D67] to-[#F3BD7E] rounded-full flex items-center justify-center text-white shadow-[0_12px_30px_rgba(232,141,103,0.35)] border-[6px] border-[#FAF8F6] active:scale-90 transition-all hover:brightness-110">
+                            <Plus className="w-8 h-8 stroke-[3.5px]" />
+                        </button>
+                    </div>
+                    <button onClick={() => setActiveTab('analytics')} className={`flex flex-col items-center gap-1.5 transition-all w-16 ${activeTab === 'analytics' ? 'text-[#E88D67]' : 'text-slate-300'}`}>
+                        <BarChart2 className={`w-6 h-6 ${activeTab === 'analytics' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                        <span className="text-[9px] font-black uppercase tracking-widest">STATS</span>
+                    </button>
+                    <button onClick={() => navigate('/profile')} className="flex flex-col items-center gap-1.5 text-slate-300 transition-all w-16 hover:text-[#E88D67]">
+                        <Settings className="w-6 h-6" />
+                        <span className="text-[9px] font-black uppercase tracking-widest">SET</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Detail Modal */}
+            {selectedFood && (
+                <div className="fixed inset-0 z-[70] bg-white animate-in slide-in-from-bottom duration-500 overflow-y-auto max-w-md mx-auto shadow-2xl">
+                    <div className="relative h-[38vh] w-full overflow-hidden">
+                        <img src={selectedFood.imageUrl || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop"} alt="Food Detail" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                        <div className="absolute top-10 left-6 right-6 flex justify-between items-center">
+                            <button onClick={() => setSelectedFood(null)} className="w-10 h-10 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-slate-800 shadow-lg"><ChevronLeft className="w-6 h-6" /></button>
+                            <button onClick={() => handleDeleteFood(selectedFood.id)} className="w-10 h-10 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-red-500 shadow-lg"><Trash2 className="w-5 h-5" /></button>
+                        </div>
+                    </div>
+                    <div className="relative -mt-12 bg-white rounded-t-[3.5rem] px-7 pt-9 pb-24 min-h-[62vh] shadow-2xl">
+                        <h2 className="text-3xl font-black text-slate-800 mb-6 tracking-tight leading-tight">{displayFood?.name}</h2>
+                        <div className="bg-[#FAF8F6] rounded-[2.5rem] p-7 border border-slate-50 mb-6 flex flex-col items-center text-center">
+                            <p className="text-5xl font-black text-slate-800">{displayFood?.calories} KCAL</p>
+                            {portion < 1 && <span className="text-xs font-bold text-orange-500 mt-2 bg-orange-50 px-3 py-1 rounded-full">ปรับลดปริมาณเหลือ {Math.round(portion * 100)}%</span>}
+                        </div>
+                        {/* Nutrition Carousel */}
+                        <div className="relative mb-8">
+                            {/* Carousel Container */}
+                            <div className="overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar">
+                                <div className="flex w-[200%]">
+                                    {/* Page 1: Macros */}
+                                    <div className="w-1/2 flex-shrink-0 snap-center px-1">
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {[
+                                                { l: 'โปรตีน', v: displayFood?.protein, unit: 'g', color: 'bg-cyan-50 border-cyan-200', icon: '🥩' },
+                                                { l: 'คาร์โบ', v: displayFood?.carbs, unit: 'g', color: 'bg-amber-50 border-amber-200', icon: '🌾' },
+                                                { l: 'ไขมัน', v: displayFood?.fat, unit: 'g', color: 'bg-lime-50 border-lime-200', icon: '💧' }
+                                            ].map(x => (
+                                                <div key={x.l} className={`${x.color} p-4 rounded-[2rem] border flex flex-col items-center text-center shadow-sm`}>
+                                                    <span className="text-2xl mb-2">{x.icon}</span>
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase mb-1">{x.l}</span>
+                                                    <p className="text-lg font-black text-slate-800">{x.v}{x.unit}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {/* Page 2: Micros */}
+                                    <div className="w-1/2 flex-shrink-0 snap-center px-1">
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {[
+                                                { l: 'คอเลสเตอรอล', v: displayFood?.cholesterol, unit: 'mg', color: 'bg-yellow-50 border-yellow-200', icon: '🍳' },
+                                                { l: 'น้ำตาล', v: displayFood?.sugar, unit: 'g', color: 'bg-pink-50 border-pink-200', icon: '🍬' },
+                                                { l: 'โซเดียม', v: displayFood?.sodium, unit: 'mg', color: 'bg-purple-50 border-purple-200', icon: '🧂' }
+                                            ].map(x => (
+                                                <div key={x.l} className={`${x.color} p-4 rounded-[2rem] border flex flex-col items-center text-center shadow-sm`}>
+                                                    <span className="text-2xl mb-2">{x.icon}</span>
+                                                    <span className="text-[9px] font-black text-slate-400 uppercase mb-1">{x.l}</span>
+                                                    <p className="text-lg font-black text-slate-800">{x.v}{x.unit}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {/* Dot Indicators */}
+                            <div className="flex justify-center gap-2 mt-4">
+                                <span className="w-2 h-2 rounded-full bg-orange-400"></span>
+                                <span className="w-2 h-2 rounded-full bg-slate-200"></span>
+                            </div>
+                            {/* Swipe Hint */}
+                            <p className="text-center text-[10px] text-slate-400 mt-2">← ปัดเพื่อดูข้อมูลเพิ่มเติม →</p>
+                        </div>
+
+                        {/* [NEW] Portion Control Plate UI */}
+                        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm mb-6">
+                            <h3 className="text-center font-black text-slate-800 text-sm mb-4">ทานไปเท่าไหร่?</h3>
+
+                            <div className="flex flex-col items-center gap-4">
+                                {/* Plate Visualization */}
+                                <div className="relative w-32 h-32">
+                                    {/* Background Plate */}
+                                    <div className="absolute inset-0 rounded-full border-4 border-slate-100 bg-slate-50"></div>
+
+                                    {/* Pizza Slices / Quadrants */}
+                                    {/* Top Right (0-25%) */}
+                                    <button
+                                        onClick={() => setPortion(0.25)}
+                                        className={`absolute top-0 right-0 w-1/2 h-1/2 rounded-tr-full border-l border-b border-white z-10 transition-all active:scale-95 ${portion >= 0.25 ? 'bg-orange-400' : 'bg-slate-200'}`}
+                                    />
+                                    {/* Bottom Right (25-50%) */}
+                                    <button
+                                        onClick={() => setPortion(0.50)}
+                                        className={`absolute bottom-0 right-0 w-1/2 h-1/2 rounded-br-full border-l border-t border-white z-10 transition-all active:scale-95 ${portion >= 0.5 ? 'bg-orange-400' : 'bg-slate-200'}`}
+                                    />
+                                    {/* Bottom Left (50-75%) */}
+                                    <button
+                                        onClick={() => setPortion(0.75)}
+                                        className={`absolute bottom-0 left-0 w-1/2 h-1/2 rounded-bl-full border-r border-t border-white z-10 transition-all active:scale-95 ${portion >= 0.75 ? 'bg-orange-400' : 'bg-slate-200'}`}
+                                    />
+                                    {/* Top Left (75-100%) */}
+                                    <button
+                                        onClick={() => setPortion(1.0)}
+                                        className={`absolute top-0 left-0 w-1/2 h-1/2 rounded-tl-full border-r border-b border-white z-10 transition-all active:scale-95 ${portion >= 1 ? 'bg-orange-400' : 'bg-slate-200'}`}
+                                    />
+
+                                    {/* Center Text */}
+                                    <div className="absolute inset-0 m-auto w-12 h-12 bg-white rounded-full z-20 flex items-center justify-center shadow-sm">
+                                        <span className="text-sm font-black text-slate-700">{Math.round(portion * 100)}%</span>
+                                    </div>
+                                </div>
+
+                                {/* Selection Buttons */}
+                                <div className="flex gap-2">
+                                    {[0.25, 0.5, 0.75, 1].map((p) => (
+                                        <button
+                                            key={p}
+                                            onClick={() => setPortion(p)}
+                                            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border ${portion === p
+                                                ? 'bg-orange-500 text-white border-orange-500 shadow-md transform scale-105'
+                                                : 'bg-white text-slate-400 border-slate-200 hover:border-orange-200'
+                                                }`}
+                                        >
+                                            {p * 100}%
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button onClick={() => setSelectedFood(null)} className="flex-1 py-5 rounded-[1.5rem] bg-slate-100 text-slate-500 font-black uppercase tracking-widest text-[11px] hover:bg-slate-200 transition-all">ยกเลิก</button>
+                            <button onClick={handleUpdatePortion} className="flex-[2] py-5 rounded-[1.5rem] bg-slate-800 text-white font-black uppercase tracking-widest text-[11px] shadow-xl active:scale-95 transition-all">
+                                {portion < 1 ? 'ยืนยันการลดปริมาณ' : 'ปิดหน้าต่าง'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Modal */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#FAF8F6]/80 backdrop-blur-md p-4 animate-in fade-in duration-300 max-w-md mx-auto">
+                    <div className="bg-white w-full rounded-[3.5rem] p-10 space-y-8 shadow-[0_-20px_80px_rgba(0,0,0,0.05)] animate-in slide-in-from-bottom-12 duration-700 max-h-[92vh] overflow-y-auto">
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-2xl font-black text-slate-800 tracking-tight">เพิ่มเมนูใหม่</h2>
+                            <button onClick={() => setShowAddModal(false)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400"><X className="w-5 h-5" /></button>
+                        </div>
+                        {isScanning ? (
+                            <div className="py-20 flex flex-col items-center justify-center text-center space-y-7">
+                                <div className="relative"><div className="w-20 h-20 border-[6px] border-orange-50 border-t-[#E88D67] rounded-full animate-spin" /><Activity className="absolute inset-0 m-auto w-6 h-6 text-[#E88D67] animate-pulse" /></div>
+                                <p className="font-black text-slate-800 text-lg">AI กำลังวิเคราะห์ข้อมูล...</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-8 pb-10">
+                                <label className="group relative block w-full bg-gradient-to-br from-[#E88D67] to-[#F3BD7E] p-8 rounded-[2.5rem] shadow-2xl shadow-orange-100 transition-all active:scale-95 cursor-pointer overflow-hidden">
+                                    <div className="relative flex flex-col items-center justify-center gap-3 text-center">
+                                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-[#E88D67] shadow-xl"><Camera className="w-8 h-8" /></div>
+                                        <span className="text-base font-black text-white block">วิเคราะห์ด้วย AI</span>
+                                    </div>
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                                </label>
+                                <button onClick={() => manualImageInputRef.current?.click()} className="flex flex-col items-center justify-center gap-2 w-full p-8 bg-white border-2 border-slate-100 text-slate-800 rounded-[2.5rem] font-black shadow-sm hover:bg-slate-50 transition-all active:scale-95">
+                                    <ImageIcon className="w-8 h-8 text-[#7DA6C9]" />
+                                    <span className="text-[11px] uppercase tracking-[0.15em] text-center">เพิ่มรูปภาพและกรอกข้อมูลเอง</span>
+                                    <input ref={manualImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleManualImageSelect} />
+                                </button>
+                                <div className="h-px bg-slate-50 w-full" />
+                                <form ref={manualFormRef} className="space-y-6 pt-4" onSubmit={handleManualSubmit}>
+                                    {previewImage && <div className="relative w-full h-40 rounded-2xl overflow-hidden mb-4 border border-slate-100"><img src={previewImage} className="w-full h-full object-cover" alt="Preview" /><button type="button" onClick={() => setPreviewImage(null)} className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-sm"><X className="w-4 h-4" /></button></div>}
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">ชื่อเมนู</label>
+                                        <input name="name" required placeholder="เช่น ผัดไทยกุ้งสด" className="w-full px-6 py-4 bg-[#FAF8F6] rounded-[1.2rem] border border-transparent focus:bg-white focus:border-slate-200 outline-none text-xs font-bold shadow-inner transition-all" />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">แคลอรี่ (kcal)</label>
+                                        <input name="calories" type="number" required placeholder="0" className="w-full px-6 py-4 bg-[#FAF8F6] rounded-[1.2rem] border border-transparent focus:bg-white focus:border-slate-200 outline-none text-xs font-bold shadow-inner transition-all" />
+                                    </div>
+
+                                    <div className="grid grid-cols-3 gap-3 pt-2">
+                                        <div className="space-y-2">
+                                            <label className="text-[9px] font-black text-cyan-500 uppercase tracking-widest ml-1 text-center block">Protein (g)</label>
+                                            <input name="protein" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-cyan-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest ml-1 text-center block">Carbs (g)</label>
+                                            <input name="carbs" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-orange-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[9px] font-black text-lime-500 uppercase tracking-widest ml-1 text-center block">Fat (g)</label>
+                                            <input name="fat" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-lime-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                        </div>
+                                    </div>
+
+                                    {/* Row 2: Micro Nutrients */}
+                                    <div className="grid grid-cols-3 gap-3 pt-2">
+                                        <div className="space-y-2">
+                                            <label className="text-[9px] font-black text-yellow-500 uppercase tracking-widest ml-1 text-center block">Cholesterol (mg)</label>
+                                            <input name="cholesterol" type="number" step="1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-yellow-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[9px] font-black text-pink-500 uppercase tracking-widest ml-1 text-center block">Sugar (g)</label>
+                                            <input name="sugar" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-pink-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-[9px] font-black text-purple-500 uppercase tracking-widest ml-1 text-center block">Sodium (mg)</label>
+                                            <input name="sodium" type="number" step="1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-purple-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                        </div>
+                                    </div>
+
+                                    <button type="submit" className="w-full py-5 mt-4 bg-gradient-to-r from-slate-800 to-black text-white rounded-[2rem] font-black shadow-2xl active:scale-95 transition-all uppercase tracking-[0.2em] text-[10px]">บันทึกข้อมูล</button>
+                                </form>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Weight Update Modal */}
+            {showWeightModal && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6 animate-in fade-in duration-300 max-w-md mx-auto">
+                    <div className="bg-white w-full rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h2 className="text-xl font-black text-slate-800">บันทึกน้ำหนัก</h2>
+                                <p className="text-[10px] text-slate-400 font-medium">อัพเดทน้ำหนักปัจจุบันของคุณ</p>
+                            </div>
+                            <button onClick={() => setShowWeightModal(false)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.target as HTMLFormElement);
+                            const newWeight = parseFloat(formData.get('weight') as string);
+                            if (isNaN(newWeight)) return;
+
+                            setCurrentWeight(newWeight);
+
+                            // Save to Supabase
+                            if (user?.id) {
+                                try {
+                                    await supabase.from('profiles').update({ current_weight: newWeight }).eq('id', user.id);
+                                } catch (err) {
+                                    console.error("Error saving weight:", err);
+                                }
+                                // Also update localStorage
+                                const offlineData = JSON.parse(localStorage.getItem('offline_profile') || '{}');
+                                offlineData.current_weight = newWeight;
+                                localStorage.setItem('offline_profile', JSON.stringify(offlineData));
+                            }
+
+                            setShowWeightModal(false);
+                        }}>
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-1 space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">น้ำหนักปัจจุบัน (kg)</label>
+                                        <input
+                                            name="weight"
+                                            type="number"
+                                            step="0.1"
+                                            defaultValue={currentWeight || ''}
+                                            placeholder="65.5"
+                                            className="w-full px-6 py-4 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-cyan-200 outline-none text-2xl font-black text-center"
+                                            autoFocus
+                                        />
+                                    </div>
+                                </div>
+
+                                {targetWeight && (
+                                    <div className="bg-cyan-50 p-4 rounded-2xl border border-cyan-100">
+                                        <p className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider mb-1">เป้าหมายของคุณ</p>
+                                        <p className="text-lg font-black text-cyan-700">{targetWeight} kg</p>
+                                        {currentWeight && (
+                                            <p className="text-[10px] text-cyan-500 mt-1">
+                                                {currentWeight > targetWeight
+                                                    ? `เหลืออีก ${(currentWeight - targetWeight).toFixed(1)} kg`
+                                                    : currentWeight < targetWeight
+                                                        ? `ต้องเพิ่มอีก ${(targetWeight - currentWeight).toFixed(1)} kg`
+                                                        : '🎉 ถึงเป้าหมายแล้ว!'}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                <button type="submit" className="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-2xl font-black text-sm shadow-lg shadow-cyan-200/50 active:scale-95 transition-all">
+                                    บันทึก
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default Dashboard;

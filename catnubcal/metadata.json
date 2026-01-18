@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Copy of NekoFit - Calorie Tracker - final 05(ใช้งานได้จริง)",
+  "description": "A gamified calorie tracker with a virtual cat companion and AI food recognition.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
