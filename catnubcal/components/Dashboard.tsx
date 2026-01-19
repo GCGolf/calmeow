@@ -1064,7 +1064,42 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
                     <div className="relative -mt-12 bg-white rounded-t-[3.5rem] px-7 pt-9 pb-24 min-h-[62vh] shadow-2xl">
-                        <h2 className="text-3xl font-black text-slate-800 mb-6 tracking-tight leading-tight">{displayFood?.name}</h2>
+                        <div className="flex justify-between items-start mb-6 gap-4">
+                            <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-tight flex-1">{displayFood?.name}</h2>
+
+                            {/* [NEW] Small Plate Portion Control */}
+                            <div className="relative w-12 h-12 shrink-0">
+                                {/* Background */}
+                                <div className="absolute inset-0 rounded-full border-2 border-slate-100 bg-slate-50"></div>
+
+                                {/* 4 Quadrants */}
+                                {/* Top-Right: 25% */}
+                                <button
+                                    onClick={() => setPortion(0.25)}
+                                    className={`absolute top-0 right-0 w-1/2 h-1/2 rounded-tr-full border-l border-b border-white z-10 active:scale-95 transition-all ${portion >= 0.25 ? 'bg-orange-400' : 'bg-slate-200'}`}
+                                />
+                                {/* Bottom-Right: 50% */}
+                                <button
+                                    onClick={() => setPortion(0.50)}
+                                    className={`absolute bottom-0 right-0 w-1/2 h-1/2 rounded-br-full border-l border-t border-white z-10 active:scale-95 transition-all ${portion >= 0.5 ? 'bg-orange-400' : 'bg-slate-200'}`}
+                                />
+                                {/* Bottom-Left: 75% */}
+                                <button
+                                    onClick={() => setPortion(0.75)}
+                                    className={`absolute bottom-0 left-0 w-1/2 h-1/2 rounded-bl-full border-r border-t border-white z-10 active:scale-95 transition-all ${portion >= 0.75 ? 'bg-orange-400' : 'bg-slate-200'}`}
+                                />
+                                {/* Top-Left: 100% */}
+                                <button
+                                    onClick={() => setPortion(1.0)}
+                                    className={`absolute top-0 left-0 w-1/2 h-1/2 rounded-tl-full border-r border-b border-white z-10 active:scale-95 transition-all ${portion >= 1 ? 'bg-orange-400' : 'bg-slate-200'}`}
+                                />
+
+                                {/* Center Label */}
+                                <div className="absolute inset-0 m-auto w-5 h-5 bg-white rounded-full z-20 flex items-center justify-center shadow-sm pointer-events-none">
+                                    <span className="text-[8px] font-black text-slate-700">{Math.round(portion * 100)}</span>
+                                </div>
+                            </div>
+                        </div>
                         <div className="bg-[#FAF8F6] rounded-[2.5rem] p-7 border border-slate-50 mb-6 flex flex-col items-center text-center">
                             <p className="text-5xl font-black text-slate-800">{displayFood?.calories} KCAL</p>
                             {portion < 1 && <span className="text-xs font-bold text-orange-500 mt-2 bg-orange-50 px-3 py-1 rounded-full">ปรับลดปริมาณเหลือ {Math.round(portion * 100)}%</span>}
@@ -1108,77 +1143,23 @@ const Dashboard: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                            {/* Dot Indicators */}
-                            <div className="flex justify-center gap-2 mt-4">
-                                <span className="w-2 h-2 rounded-full bg-orange-400"></span>
-                                <span className="w-2 h-2 rounded-full bg-slate-200"></span>
-                            </div>
-                            {/* Swipe Hint */}
-                            <p className="text-center text-[10px] text-slate-400 mt-2">← ปัดเพื่อดูข้อมูลเพิ่มเติม →</p>
                         </div>
-
-                        {/* [NEW] Portion Control Plate UI */}
-                        <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm mb-6">
-                            <h3 className="text-center font-black text-slate-800 text-sm mb-4">ทานไปเท่าไหร่?</h3>
-
-                            <div className="flex flex-col items-center gap-4">
-                                {/* Plate Visualization */}
-                                <div className="relative w-32 h-32">
-                                    {/* Background Plate */}
-                                    <div className="absolute inset-0 rounded-full border-4 border-slate-100 bg-slate-50"></div>
-
-                                    {/* Pizza Slices / Quadrants */}
-                                    {/* Top Right (0-25%) */}
-                                    <button
-                                        onClick={() => setPortion(0.25)}
-                                        className={`absolute top-0 right-0 w-1/2 h-1/2 rounded-tr-full border-l border-b border-white z-10 transition-all active:scale-95 ${portion >= 0.25 ? 'bg-orange-400' : 'bg-slate-200'}`}
-                                    />
-                                    {/* Bottom Right (25-50%) */}
-                                    <button
-                                        onClick={() => setPortion(0.50)}
-                                        className={`absolute bottom-0 right-0 w-1/2 h-1/2 rounded-br-full border-l border-t border-white z-10 transition-all active:scale-95 ${portion >= 0.5 ? 'bg-orange-400' : 'bg-slate-200'}`}
-                                    />
-                                    {/* Bottom Left (50-75%) */}
-                                    <button
-                                        onClick={() => setPortion(0.75)}
-                                        className={`absolute bottom-0 left-0 w-1/2 h-1/2 rounded-bl-full border-r border-t border-white z-10 transition-all active:scale-95 ${portion >= 0.75 ? 'bg-orange-400' : 'bg-slate-200'}`}
-                                    />
-                                    {/* Top Left (75-100%) */}
-                                    <button
-                                        onClick={() => setPortion(1.0)}
-                                        className={`absolute top-0 left-0 w-1/2 h-1/2 rounded-tl-full border-r border-b border-white z-10 transition-all active:scale-95 ${portion >= 1 ? 'bg-orange-400' : 'bg-slate-200'}`}
-                                    />
-
-                                    {/* Center Text */}
-                                    <div className="absolute inset-0 m-auto w-12 h-12 bg-white rounded-full z-20 flex items-center justify-center shadow-sm">
-                                        <span className="text-sm font-black text-slate-700">{Math.round(portion * 100)}%</span>
-                                    </div>
-                                </div>
-
-                                {/* Selection Buttons */}
-                                <div className="flex gap-2">
-                                    {[0.25, 0.5, 0.75, 1].map((p) => (
-                                        <button
-                                            key={p}
-                                            onClick={() => setPortion(p)}
-                                            className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border ${portion === p
-                                                ? 'bg-orange-500 text-white border-orange-500 shadow-md transform scale-105'
-                                                : 'bg-white text-slate-400 border-slate-200 hover:border-orange-200'
-                                                }`}
-                                        >
-                                            {p * 100}%
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                        {/* Dot Indicators */}
+                        <div className="flex justify-center gap-2 mt-4">
+                            <span className="w-2 h-2 rounded-full bg-orange-400"></span>
+                            <span className="w-2 h-2 rounded-full bg-slate-200"></span>
                         </div>
+                        {/* Swipe Hint */}
+                        <p className="text-center text-[10px] text-slate-400 mt-2">← ปัดเพื่อดูข้อมูลเพิ่มเติม →</p>
+                    </div>
 
-                        <div className="flex gap-3">
-                            <button onClick={() => setSelectedFood(null)} className="flex-1 py-5 rounded-[1.5rem] bg-slate-100 text-slate-500 font-black uppercase tracking-widest text-[11px] hover:bg-slate-200 transition-all">ยกเลิก</button>
-                            <button onClick={handleUpdatePortion} className="flex-[2] py-5 rounded-[1.5rem] bg-slate-800 text-white font-black uppercase tracking-widest text-[11px] shadow-xl active:scale-95 transition-all">
-                                {portion < 1 ? 'ยืนยันการลดปริมาณ' : 'ปิดหน้าต่าง'}
-                            </button>
-                        </div>
+
+
+                    <div className="flex gap-3">
+                        <button onClick={() => setSelectedFood(null)} className="flex-1 py-5 rounded-[1.5rem] bg-slate-100 text-slate-500 font-black uppercase tracking-widest text-[11px] hover:bg-slate-200 transition-all">ยกเลิก</button>
+                        <button onClick={handleUpdatePortion} className="flex-[2] py-5 rounded-[1.5rem] bg-slate-800 text-white font-black uppercase tracking-widest text-[11px] shadow-xl active:scale-95 transition-all">
+                            {portion < 1 ? 'ยืนยันการลดปริมาณ' : 'ปิดหน้าต่าง'}
+                        </button>
                     </div>
                 </div>
             )}
@@ -1261,86 +1242,89 @@ const Dashboard: React.FC = () => {
                         )}
                     </div>
                 </div>
-            )}
+            )
+            }
 
             {/* Weight Update Modal */}
-            {showWeightModal && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6 animate-in fade-in duration-300 max-w-md mx-auto">
-                    <div className="bg-white w-full rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-                        <div className="flex justify-between items-center mb-6">
-                            <div>
-                                <h2 className="text-xl font-black text-slate-800">บันทึกน้ำหนัก</h2>
-                                <p className="text-[10px] text-slate-400 font-medium">อัพเดทน้ำหนักปัจจุบันของคุณ</p>
-                            </div>
-                            <button onClick={() => setShowWeightModal(false)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <form onSubmit={async (e) => {
-                            e.preventDefault();
-                            const formData = new FormData(e.target as HTMLFormElement);
-                            const newWeight = parseFloat(formData.get('weight') as string);
-                            if (isNaN(newWeight)) return;
-
-                            setCurrentWeight(newWeight);
-
-                            // Save to Supabase
-                            if (user?.id) {
-                                try {
-                                    await supabase.from('profiles').update({ current_weight: newWeight }).eq('id', user.id);
-                                } catch (err) {
-                                    console.error("Error saving weight:", err);
-                                }
-                                // Also update localStorage
-                                const offlineData = JSON.parse(localStorage.getItem('offline_profile') || '{}');
-                                offlineData.current_weight = newWeight;
-                                localStorage.setItem('offline_profile', JSON.stringify(offlineData));
-                            }
-
-                            setShowWeightModal(false);
-                        }}>
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="flex-1 space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">น้ำหนักปัจจุบัน (kg)</label>
-                                        <input
-                                            name="weight"
-                                            type="number"
-                                            step="0.1"
-                                            defaultValue={currentWeight || ''}
-                                            placeholder="65.5"
-                                            className="w-full px-6 py-4 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-cyan-200 outline-none text-2xl font-black text-center"
-                                            autoFocus
-                                        />
-                                    </div>
+            {
+                showWeightModal && (
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6 animate-in fade-in duration-300 max-w-md mx-auto">
+                        <div className="bg-white w-full rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 className="text-xl font-black text-slate-800">บันทึกน้ำหนัก</h2>
+                                    <p className="text-[10px] text-slate-400 font-medium">อัพเดทน้ำหนักปัจจุบันของคุณ</p>
                                 </div>
-
-                                {targetWeight && (
-                                    <div className="bg-cyan-50 p-4 rounded-2xl border border-cyan-100">
-                                        <p className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider mb-1">เป้าหมายของคุณ</p>
-                                        <p className="text-lg font-black text-cyan-700">{targetWeight} kg</p>
-                                        {currentWeight && (
-                                            <p className="text-[10px] text-cyan-500 mt-1">
-                                                {currentWeight > targetWeight
-                                                    ? `เหลืออีก ${(currentWeight - targetWeight).toFixed(1)} kg`
-                                                    : currentWeight < targetWeight
-                                                        ? `ต้องเพิ่มอีก ${(targetWeight - currentWeight).toFixed(1)} kg`
-                                                        : '🎉 ถึงเป้าหมายแล้ว!'}
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-
-                                <button type="submit" className="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-2xl font-black text-sm shadow-lg shadow-cyan-200/50 active:scale-95 transition-all">
-                                    บันทึก
+                                <button onClick={() => setShowWeightModal(false)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100">
+                                    <X className="w-5 h-5" />
                                 </button>
                             </div>
-                        </form>
+
+                            <form onSubmit={async (e) => {
+                                e.preventDefault();
+                                const formData = new FormData(e.target as HTMLFormElement);
+                                const newWeight = parseFloat(formData.get('weight') as string);
+                                if (isNaN(newWeight)) return;
+
+                                setCurrentWeight(newWeight);
+
+                                // Save to Supabase
+                                if (user?.id) {
+                                    try {
+                                        await supabase.from('profiles').update({ current_weight: newWeight }).eq('id', user.id);
+                                    } catch (err) {
+                                        console.error("Error saving weight:", err);
+                                    }
+                                    // Also update localStorage
+                                    const offlineData = JSON.parse(localStorage.getItem('offline_profile') || '{}');
+                                    offlineData.current_weight = newWeight;
+                                    localStorage.setItem('offline_profile', JSON.stringify(offlineData));
+                                }
+
+                                setShowWeightModal(false);
+                            }}>
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex-1 space-y-2">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">น้ำหนักปัจจุบัน (kg)</label>
+                                            <input
+                                                name="weight"
+                                                type="number"
+                                                step="0.1"
+                                                defaultValue={currentWeight || ''}
+                                                placeholder="65.5"
+                                                className="w-full px-6 py-4 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-cyan-200 outline-none text-2xl font-black text-center"
+                                                autoFocus
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {targetWeight && (
+                                        <div className="bg-cyan-50 p-4 rounded-2xl border border-cyan-100">
+                                            <p className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider mb-1">เป้าหมายของคุณ</p>
+                                            <p className="text-lg font-black text-cyan-700">{targetWeight} kg</p>
+                                            {currentWeight && (
+                                                <p className="text-[10px] text-cyan-500 mt-1">
+                                                    {currentWeight > targetWeight
+                                                        ? `เหลืออีก ${(currentWeight - targetWeight).toFixed(1)} kg`
+                                                        : currentWeight < targetWeight
+                                                            ? `ต้องเพิ่มอีก ${(targetWeight - currentWeight).toFixed(1)} kg`
+                                                            : '🎉 ถึงเป้าหมายแล้ว!'}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <button type="submit" className="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-2xl font-black text-sm shadow-lg shadow-cyan-200/50 active:scale-95 transition-all">
+                                        บันทึก
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 
