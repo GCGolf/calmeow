@@ -1,20 +1,34 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# CalMeow (Project อย่านับแคล) 🐱🍽️
 
-# Run and deploy your AI Studio app
+Application for tracking calories and nutrition with a fun, premium "Neko" theme, designed specifically for Thai users.
 
-This contains everything you need to run your app locally.
+## 📘 Developer Documentation (Start Here!)
+**[dev_log.md](./dev_log.md)** 👈 **READ THIS FIRST**
+This file contains:
+- Current project status
+- Daily changelogs
+- Feature implementations details
+- Known issues
 
-View your app in AI Studio: https://ai.studio/apps/drive/1KIpp1-ovEXxWfl8qFK0o9yNFsZetJ4YP
+## 🚀 Key Features
+- **AI Food Recognition**: Powered by Gemini API (with expert Thai Nutritionist persona).
+- **Smart Portion Control**: Interactive quadrant UI for adjusting servings.
+- **Menu Roulette**: Fun "Blind Box" feature for randomizing meals.
+- **Privacy First**: Offline-first architecture with Supabase syncing.
 
-## Run Locally
+## 🛠️ Setup & Run
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+2. **Environment Setup**:
+   - Ensure `.env` or Vercel Environment Variables are set (`VITE_SUPABASE_URL`, `GEMINI_API_KEY`, etc.)
+3. **Run Locally**:
+   ```bash
+   npm run dev
+   ```
 
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 📦 Deployment
+- **Platform**: Vercel
+- **Repo**: [GitHub Link](https://github.com/GCGolf/calmeow)
+- **Config**: Root directory set to `catnubcal`.

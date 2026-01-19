@@ -1,6 +1,29 @@
 # Developer Log - NekoFit Project
-**Last Updated:** 2026-01-14 20:40
-**Status:** Core Features Stable, UI Simplified
+**Last Updated:** 2026-01-19 20:46
+**Status:** AI Optimized, Deployment Ready
+
+---
+
+## ✅ Completed Today (Session 5 - Jan 19)
+
+### 1. AI Food Recognition Optimization (Prompt Engineering)
+- **Problem**: AI failed to recognize simple foods (e.g., Rice, Bread) and hallucinated complex dishes.
+- **Solution**:
+    - **Persona**: Added "Expert Thai Nutritionist" persona.
+    - **Logic Split**: Instructed AI to differentiate between "Simple Foods" (identify directly) and "Complex Dishes" (scan for toppings).
+    - **Model**: Retained `gemini-3-flash-preview` per user request.
+    - **Result**: AI now correctly handles both simple items and complex meals.
+
+### 2. UI Refinement (Portion Control)
+- **Problem**: "Plate" visualization was too large and cluttered the UI.
+- **Solution**:
+    - **New Design**: Moved portion control to the Header (Compact 4-Quadrant Icon).
+    - **Interaction**: Users click quadrants (25%, 50%, 75%, 100%) to adjust.
+    - **Simplified**: Removed the bottom button row.
+
+### 3. Deployment (Vercel)
+- **Config**: Added `vercel.json` and set Root Directory to `catnubcal`.
+- **Status**: Code pushed to GitHub (`eecef4e`) and watching for Vercel deployment.
 
 ---
 
