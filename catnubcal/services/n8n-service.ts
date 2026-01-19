@@ -33,15 +33,12 @@ export const analyzeFoodImage = async (file: File): Promise<Partial<FoodItem>> =
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const imagePart = await fileToGenerativePart(file);
 
-    const prompt = `You are an expert Thai Nutritionist. Analyze the food in this image and identify what it is.
-
-    CRITICAL RULES:
-    1. **NEVER return empty values**: You MUST always provide a valid name and calorie estimate. If you see rice, say "ข้าวสวย". If you see bread or sandwich, say "แซนด์วิช" or "ขนมปังโฮลวีท". NEVER leave the name blank or return 0 calories for real food.
-    2. **Simple Foods First**: If the image shows basic items (plain rice, boiled egg, bread, sandwich), identify them DIRECTLY without overthinking (e.g., "ข้าวสวย", "ไข่ต้ม", "แซนด์วิชไข่ทูน่า").
-    3. **Complex Foods**: If the dish has multiple components (e.g., rice with curry and toppings), list ALL components in the name for accurate nutrition.
-    4. **Thai Context**: Use natural Thai dish names.
-    5. **Realistic Estimates**: Use standard Thai serving sizes for calorie/nutrient estimates.
-    6. Return the data strictly in JSON format matching the requested schema.`;
+    const prompt = `Analyze the food in this image and identify the dish name in Thai.
+    ESTIMATION RULES:
+    1. STRICTLY use standard nutritional databases for the identified dish.
+    2. Do NOT hallucinate or guess random numbers. Use the average values for a standard serving.
+    3. For 'cholesterol', 'sugar', and 'sodium', be realistic. If the dish is known to be high in these (e.g. fried food, desserts), reflect that accurately.
+    4. Return the data strictly in JSON format matching the requested schema.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
