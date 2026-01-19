@@ -370,13 +370,13 @@ const Dashboard: React.FC = () => {
                 const { data, error } = await supabase.from('food_logs').insert([{
                     user_id: userId,
                     food_name: result.name || 'AI Analysis',
-                    calories: result.calories || 0,
-                    protein: result.protein || 0,
-                    carbs: result.carbs || 0,
-                    fat: result.fat || 0,
-                    sugar: result.sugar || 0,
-                    sodium: result.sodium || 0,
-                    cholesterol: result.cholesterol || 0,
+                    calories: Math.round(result.calories || 0),
+                    protein: Math.round(result.protein || 0),
+                    carbs: Math.round(result.carbs || 0),
+                    fat: Math.round(result.fat || 0),
+                    sugar: Math.round(result.sugar || 0),
+                    sodium: Math.round(result.sodium || 0),
+                    cholesterol: Math.round(result.cholesterol || 0),
                     image_url: capturedImage,
                     created_at: logDate.toISOString()
                 }]).select().single();

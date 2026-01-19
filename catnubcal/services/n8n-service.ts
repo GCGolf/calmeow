@@ -33,12 +33,18 @@ export const analyzeFoodImage = async (file: File): Promise<Partial<FoodItem>> =
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const imagePart = await fileToGenerativePart(file);
 
-    const prompt = `Analyze the food in this image and identify the dish name in Thai.
-    ESTIMATION RULES:
-    1. STRICTLY use standard nutritional databases for the identified dish.
-    2. Do NOT hallucinate or guess random numbers. Use the average values for a standard serving.
-    3. For 'cholesterol', 'sugar', and 'sodium', be realistic. If the dish is known to be high in these (e.g. fried food, desserts), reflect that accurately.
-    4. Return the data strictly in JSON format matching the requested schema.`;
+    const prompt = `You are an expert Thai Nutritionist analyzing food images.
+
+    RULES:
+    1. **Simple Foods ARE Valid**: Even if you only see plain steamed white rice by itself with NO side dishes, that IS food. Identify it as "ข้าวสวย" (approximately 200 kcal per serving). Do NOT return empty just because there's no curry or toppings.
+       - White/Steamed Rice alone = "ข้าวสวย"
+       - Bread or Toast = "ขนมปัง"
+       - Sandwich = "แซนด์วิช" (describe fillings if visible)
+       - Boiled Egg = "ไข่ต้ม"
+    2. **Complex Dishes**: For dishes with multiple components, list all visible items in the name.
+    3. **Thai Names**: Always use Thai dish names.
+    4. **Accurate Estimates**: Use standard Thai serving sizes for nutrition values.
+    5. Return valid JSON matching the schema. Never return empty name or 0 calories for real food.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
