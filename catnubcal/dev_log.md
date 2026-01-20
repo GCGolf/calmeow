@@ -1,8 +1,30 @@
 # Developer Log - NekoFit Project
-**Last Updated:** 2026-01-19 20:46
-**Status:** AI Optimized, Deployment Ready
+**Last Updated:** 2026-01-20 21:00
+**Status:** Favorite Menu Implemented, Optimized & Bug Fixed
 
 ---
+
+## ✅ Completed Today (Session 6 - Jan 20)
+
+### 1. Favorite Menu Feature (เมนูที่ถูกใจ)
+- **Feature**: Added "Favorite Menu" system for quick logging.
+- **Components**:
+    - `FavoriteMenuModal`: Displays list of favorites with preview images.
+    - **Toggle System**: Heart icon (❤️/🤍) on food detail modal to add/remove favorites.
+    - **Integration**: Added "Favorite Menu" button to the Add Food modal.
+- **Database**: efficient `favorite_foods` table with RLS and UNIQUE constraints.
+- **UX**: Automatic data mapping (saves macros, calories, image) for instant logging.
+
+### 2. UI/UX Improvements
+- **Manual Entry Form**: Hidden by default to declutter UI. Toggles via "เพิ่มรูปภาพและกรอกข้อมูลเอง" button.
+- **Heart Icon**: Moved to prominent position next to food name.
+- **Real-time Feedback**: Immediate heart state updates.
+- **Preview Images**: Correctly mapped from DB (`snake_case` -> `camelCase`) to ensure images show up.
+
+### 3. Critical Bug Fixes
+- **Portion Control Fix**: Fixed `invalid input syntax for type integer` error by forcing `Math.round()` on all nutritional values before saving.
+- **Duplicate Favorites**: Added UNIQUE constraint on `(user_id, name)` to prevent duplicate entries.
+- **Z-Index Fixes**: Fixed modal layering issues where Favorite modal appeared behind Add modal.
 
 ## ✅ Completed Today (Session 5 - Jan 19)
 

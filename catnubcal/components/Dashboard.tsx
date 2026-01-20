@@ -37,6 +37,7 @@ import Analytics from './Analytics';
 import MovingBackground from './MovingBackground';
 import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../services/AuthContext';
+import FavoriteMenuModal from './FavoriteMenuModal';
 
 const Dashboard: React.FC = () => {
     const { user, signOut } = useAuth();
@@ -52,12 +53,142 @@ const Dashboard: React.FC = () => {
     const [currentWeight, setCurrentWeight] = useState<number | null>(null); // [NEW] Weight state
     const [targetWeight, setTargetWeight] = useState<number | null>(null);
     const [streak, setStreak] = useState(0); // [NEW] Streak State
-
     const [showWeightModal, setShowWeightModal] = useState(false);
     const [nutrientPage, setNutrientPage] = useState(0); // [NEW] Carousel page state (0 = Macros, 1 = Micros)
 
+    // [NEW] Favorite Menu State
+    const [showFavoriteModal, setShowFavoriteModal] = useState(false);
+    const [isFavorite, setIsFavorite] = useState(false);
+    const [showManualForm, setShowManualForm] = useState(false); // Toggle manual entry form
+
+    // Check if current food is favorited when selectedFood changes
+    useEffect(() => {
+        const checkFavorite = async () => {
+            if (!selectedFood || !user) {
+                setIsFavorite(false);
+                return;
+            }
+            try {
+                const { data, error } = await supabase
+                    .from('favorite_foods')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('name', selectedFood.name)
+                    .maybeSingle();
+
+                setIsFavorite(!!data);
+            } catch (err) {
+                console.error("Error checking favorite:", err);
+                setIsFavorite(false);
+            }
+        };
+        checkFavorite();
+    }, [selectedFood, user]);
+
+    // Toggle Favorite Status (Add or Remove)
+    const handleToggleFavorite = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!selectedFood || !user) return;
+
+        try {
+            if (isFavorite) {
+                // Remove from favorites
+                const { error } = await supabase
+                    .from('favorite_foods')
+                    .delete()
+                    .eq('user_id', user.id)
+                    .eq('name', selectedFood.name);
+
+                if (error) throw error;
+                setIsFavorite(false);
+            } else {
+                // Add to favorites
+                const { data, error } = await supabase
+                    .from('favorite_foods')
+                    .insert([{
+                        user_id: user.id,
+                        name: selectedFood.name,
+                        calories: selectedFood.calories,
+                        protein: selectedFood.protein,
+                        carbs: selectedFood.carbs,
+                        fat: selectedFood.fat,
+                        image_url: selectedFood.imageUrl
+                    }])
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                setIsFavorite(true);
+            }
+        } catch (err) {
+            console.error("Error toggling favorite:", err);
+            alert('เกิดข้อผิดพลาด');
+        }
+    };
+
+
+
     // Date Selection State - MOVED UP to fix ReferenceError
     const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
+
+    // Handle Selecting from Favorite Menu
+    const handleSelectFavorite = async (favFood: FoodItem) => {
+        const userId = user?.id;
+        if (!userId) return;
+
+        const logDate = new Date(selectedDate);
+        logDate.setHours(12, 0, 0, 0);
+
+        const newEntry = {
+            user_id: userId,
+            food_name: favFood.name,
+            calories: Math.round(favFood.calories || 0),
+            protein: Math.round(favFood.protein || 0),
+            carbs: Math.round(favFood.carbs || 0),
+            fat: Math.round(favFood.fat || 0),
+            sugar: 0,
+            sodium: 0,
+            cholesterol: 0,
+            image_url: favFood.imageUrl || null,
+            created_at: logDate.toISOString()
+        };
+
+        try {
+            const { data, error } = await supabase.from('food_logs').insert([newEntry]).select().single();
+
+            if (error) {
+                console.error("Error inserting food log:", error);
+                alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
+                return;
+            }
+
+            if (data) {
+                const newFood: FoodItem = {
+                    id: data.id,
+                    name: data.food_name,
+                    calories: data.calories,
+                    protein: data.protein,
+                    carbs: data.carbs,
+                    fat: data.fat,
+                    timestamp: new Date(data.created_at).getTime(),
+                    meal: 'มื้อกลางวัน',
+                    imageUrl: data.image_url,
+                    fiber: 0,
+                    sugar: data.sugar || 0,
+                    sodium: data.sodium || 0,
+                    cholesterol: data.cholesterol || 0,
+                    servingSize: { unit: 'serving', quantity: 1 }
+                };
+                setFoodLog(prev => [...prev, newFood]);
+            }
+        } catch (err) {
+            console.error("Error:", err);
+            alert('เกิดข้อผิดพลาด');
+        }
+
+        setShowFavoriteModal(false);
+        setShowAddModal(false);
+    };
 
     // Generate 7 days centered around Today
     const dateButtons = useMemo(() => {
@@ -568,11 +699,11 @@ const Dashboard: React.FC = () => {
 
         const userId = user?.id;
         const newCalories = Math.round(baseStats.calories * portion);
-        const newProtein = Number((baseStats.protein * portion).toFixed(1));
-        const newCarbs = Number((baseStats.carbs * portion).toFixed(1));
-        const newFat = Number((baseStats.fat * portion).toFixed(1));
+        const newProtein = Math.round(baseStats.protein * portion);
+        const newCarbs = Math.round(baseStats.carbs * portion);
+        const newFat = Math.round(baseStats.fat * portion);
         const newChol = Math.round(baseStats.cholesterol * portion);
-        const newSugar = Number((baseStats.sugar * portion).toFixed(1));
+        const newSugar = Math.round(baseStats.sugar * portion);
         const newSodium = Math.round(baseStats.sodium * portion);
 
         const updatedFields = {
@@ -625,11 +756,11 @@ const Dashboard: React.FC = () => {
         return {
             ...baseStats,
             calories: Math.round(baseStats.calories * portion),
-            protein: Number((baseStats.protein * portion).toFixed(1)),
-            carbs: Number((baseStats.carbs * portion).toFixed(1)),
-            fat: Number((baseStats.fat * portion).toFixed(1)),
+            protein: Math.round(baseStats.protein * portion),
+            carbs: Math.round(baseStats.carbs * portion),
+            fat: Math.round(baseStats.fat * portion),
             cholesterol: Math.round(baseStats.cholesterol * portion),
-            sugar: Number((baseStats.sugar * portion).toFixed(1)),
+            sugar: Math.round(baseStats.sugar * portion),
             sodium: Math.round(baseStats.sodium * portion),
         };
     }, [baseStats, portion, selectedFood]);
@@ -1065,9 +1196,21 @@ const Dashboard: React.FC = () => {
                     </div>
                     <div className="relative -mt-12 bg-white rounded-t-[3.5rem] px-7 pt-9 pb-24 min-h-[62vh] shadow-2xl">
                         <div className="flex justify-between items-start mb-6 gap-4">
-                            <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-tight flex-1">{displayFood?.name}</h2>
+                            <div className="flex items-center gap-3 flex-1">
+                                {/* [NEW] Heart Button (Moved to front) */}
+                                <button
+                                    onClick={handleToggleFavorite}
+                                    className={`w-10 h-10 rounded-full border flex items-center justify-center hover:scale-110 transition-all active:scale-90 shadow-sm shrink-0 ${isFavorite
+                                        ? 'bg-pink-100 border-pink-300 text-red-500'
+                                        : 'bg-slate-50 border-slate-200 text-slate-300'
+                                        }`}
+                                >
+                                    {isFavorite ? '❤️' : '🤍'}
+                                </button>
+                                <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-tight">{displayFood?.name}</h2>
+                            </div>
 
-                            {/* [NEW] Small Plate Portion Control */}
+                            {/* [RESTORED] Small Plate Portion Control */}
                             <div className="relative w-12 h-12 shrink-0">
                                 {/* Background */}
                                 <div className="absolute inset-0 rounded-full border-2 border-slate-100 bg-slate-50"></div>
@@ -1186,58 +1329,90 @@ const Dashboard: React.FC = () => {
                                     </div>
                                     <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
                                 </label>
-                                <button onClick={() => manualImageInputRef.current?.click()} className="flex flex-col items-center justify-center gap-2 w-full p-8 bg-white border-2 border-slate-100 text-slate-800 rounded-[2.5rem] font-black shadow-sm hover:bg-slate-50 transition-all active:scale-95">
+                                <button
+                                    onClick={() => setShowManualForm(!showManualForm)}
+                                    className={`flex flex-col items-center justify-center gap-2 w-full p-8 border-2 text-slate-800 rounded-[2.5rem] font-black shadow-sm transition-all active:scale-95 ${showManualForm
+                                            ? 'bg-slate-100 border-slate-200'
+                                            : 'bg-white border-slate-100 hover:bg-slate-50'
+                                        }`}
+                                >
                                     <ImageIcon className="w-8 h-8 text-[#7DA6C9]" />
-                                    <span className="text-[11px] uppercase tracking-[0.15em] text-center">เพิ่มรูปภาพและกรอกข้อมูลเอง</span>
-                                    <input ref={manualImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleManualImageSelect} />
+                                    <span className="text-[11px] uppercase tracking-[0.15em] text-center">
+                                        {showManualForm ? 'ซ่อนฟอร์มกรอกข้อมูล' : 'เพิ่มรูปภาพและกรอกข้อมูลเอง'}
+                                    </span>
                                 </button>
-                                <div className="h-px bg-slate-50 w-full" />
-                                <form ref={manualFormRef} className="space-y-6 pt-4" onSubmit={handleManualSubmit}>
-                                    {previewImage && <div className="relative w-full h-40 rounded-2xl overflow-hidden mb-4 border border-slate-100"><img src={previewImage} className="w-full h-full object-cover" alt="Preview" /><button type="button" onClick={() => setPreviewImage(null)} className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-sm"><X className="w-4 h-4" /></button></div>}
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">ชื่อเมนู</label>
-                                        <input name="name" required placeholder="เช่น ผัดไทยกุ้งสด" className="w-full px-6 py-4 bg-[#FAF8F6] rounded-[1.2rem] border border-transparent focus:bg-white focus:border-slate-200 outline-none text-xs font-bold shadow-inner transition-all" />
-                                    </div>
+                                {/* [NEW] Favorite Menu Button */}
+                                <button
+                                    onClick={() => setShowFavoriteModal(true)}
+                                    className="flex flex-col items-center justify-center gap-2 w-full p-8 bg-gradient-to-br from-pink-50 to-rose-50 border-2 border-pink-100 text-slate-800 rounded-[2.5rem] font-black shadow-sm hover:from-pink-100 hover:to-rose-100 transition-all active:scale-95"
+                                >
+                                    <span className="text-3xl">❤️</span>
+                                    <span className="text-[11px] uppercase tracking-[0.15em] text-center text-pink-600">เพิ่มเมนูที่ถูกใจ</span>
+                                </button>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">แคลอรี่ (kcal)</label>
-                                        <input name="calories" type="number" required placeholder="0" className="w-full px-6 py-4 bg-[#FAF8F6] rounded-[1.2rem] border border-transparent focus:bg-white focus:border-slate-200 outline-none text-xs font-bold shadow-inner transition-all" />
-                                    </div>
+                                {/* Manual Form - Only show when toggled */}
+                                {showManualForm && (
+                                    <>
+                                        <div className="h-px bg-slate-50 w-full" />
+                                        <form ref={manualFormRef} className="space-y-6 pt-4" onSubmit={handleManualSubmit}>
+                                            {/* Image Upload Button */}
+                                            <button
+                                                type="button"
+                                                onClick={() => manualImageInputRef.current?.click()}
+                                                className="w-full p-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:border-[#7DA6C9] hover:text-[#7DA6C9] transition-all"
+                                            >
+                                                📷 กดเพื่อเลือกรูปภาพ
+                                            </button>
+                                            <input ref={manualImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleManualImageSelect} />
 
-                                    <div className="grid grid-cols-3 gap-3 pt-2">
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-cyan-500 uppercase tracking-widest ml-1 text-center block">Protein (g)</label>
-                                            <input name="protein" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-cyan-100 outline-none text-[11px] font-black text-center shadow-inner" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest ml-1 text-center block">Carbs (g)</label>
-                                            <input name="carbs" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-orange-100 outline-none text-[11px] font-black text-center shadow-inner" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-lime-500 uppercase tracking-widest ml-1 text-center block">Fat (g)</label>
-                                            <input name="fat" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-lime-100 outline-none text-[11px] font-black text-center shadow-inner" />
-                                        </div>
-                                    </div>
+                                            {previewImage && <div className="relative w-full h-40 rounded-2xl overflow-hidden mb-4 border border-slate-100"><img src={previewImage} className="w-full h-full object-cover" alt="Preview" /><button type="button" onClick={() => setPreviewImage(null)} className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-sm"><X className="w-4 h-4" /></button></div>}
 
-                                    {/* Row 2: Micro Nutrients */}
-                                    <div className="grid grid-cols-3 gap-3 pt-2">
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-yellow-500 uppercase tracking-widest ml-1 text-center block">Cholesterol (mg)</label>
-                                            <input name="cholesterol" type="number" step="1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-yellow-100 outline-none text-[11px] font-black text-center shadow-inner" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-pink-500 uppercase tracking-widest ml-1 text-center block">Sugar (g)</label>
-                                            <input name="sugar" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-pink-100 outline-none text-[11px] font-black text-center shadow-inner" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black text-purple-500 uppercase tracking-widest ml-1 text-center block">Sodium (mg)</label>
-                                            <input name="sodium" type="number" step="1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-purple-100 outline-none text-[11px] font-black text-center shadow-inner" />
-                                        </div>
-                                    </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">ชื่อเมนู</label>
+                                                <input name="name" required placeholder="เช่น ผัดไทยกุ้งสด" className="w-full px-6 py-4 bg-[#FAF8F6] rounded-[1.2rem] border border-transparent focus:bg-white focus:border-slate-200 outline-none text-xs font-bold shadow-inner transition-all" />
+                                            </div>
 
-                                    <button type="submit" className="w-full py-5 mt-4 bg-gradient-to-r from-slate-800 to-black text-white rounded-[2rem] font-black shadow-2xl active:scale-95 transition-all uppercase tracking-[0.2em] text-[10px]">บันทึกข้อมูล</button>
-                                </form>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">แคลอรี่ (kcal)</label>
+                                                <input name="calories" type="number" required placeholder="0" className="w-full px-6 py-4 bg-[#FAF8F6] rounded-[1.2rem] border border-transparent focus:bg-white focus:border-slate-200 outline-none text-xs font-bold shadow-inner transition-all" />
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-3 pt-2">
+                                                <div className="space-y-2">
+                                                    <label className="text-[9px] font-black text-cyan-500 uppercase tracking-widest ml-1 text-center block">Protein (g)</label>
+                                                    <input name="protein" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-cyan-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest ml-1 text-center block">Carbs (g)</label>
+                                                    <input name="carbs" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-orange-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[9px] font-black text-lime-500 uppercase tracking-widest ml-1 text-center block">Fat (g)</label>
+                                                    <input name="fat" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-lime-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                                </div>
+                                            </div>
+
+                                            {/* Row 2: Micro Nutrients */}
+                                            <div className="grid grid-cols-3 gap-3 pt-2">
+                                                <div className="space-y-2">
+                                                    <label className="text-[9px] font-black text-yellow-500 uppercase tracking-widest ml-1 text-center block">Cholesterol (mg)</label>
+                                                    <input name="cholesterol" type="number" step="1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-yellow-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[9px] font-black text-pink-500 uppercase tracking-widest ml-1 text-center block">Sugar (g)</label>
+                                                    <input name="sugar" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-pink-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-[9px] font-black text-purple-500 uppercase tracking-widest ml-1 text-center block">Sodium (mg)</label>
+                                                    <input name="sodium" type="number" step="1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-purple-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                                </div>
+                                            </div>
+
+                                            <button type="submit" className="w-full py-5 mt-4 bg-gradient-to-r from-slate-800 to-black text-white rounded-[2rem] font-black shadow-2xl active:scale-95 transition-all uppercase tracking-[0.2em] text-[10px]">บันทึกข้อมูล</button>
+                                        </form>
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>
@@ -1324,6 +1499,13 @@ const Dashboard: React.FC = () => {
                     </div>
                 )
             }
+            {/* Favorite Menu Modal */}
+            <FavoriteMenuModal
+                isOpen={showFavoriteModal}
+                onClose={() => setShowFavoriteModal(false)}
+                onSelectFood={handleSelectFavorite}
+                userId={user?.id || ''}
+            />
         </div >
     );
 };
