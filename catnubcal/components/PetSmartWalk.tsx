@@ -272,23 +272,34 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
                         {/* Shadow */}
                         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[60%] h-3 bg-black/5 blur-sm rounded-full z-0 transition-all duration-300 fake-shadow"></div>
 
-                        {/* Cat Image */}
+                        {/* Cat Image - Optimized */}
                         <img
                             src={displayImageSrc}
                             alt="My Cat"
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-auto relative z-10 origin-bottom transition-transform duration-300 drop-shadow-sm select-none"
                         />
                     </div>
                 </div>
             </div>
 
-            {/* Global Styles */}
+            {/* Global Styles - Optimized for Mobile */}
             <style>{`
+                /* Respect user preference for reduced motion */
+                @media (prefers-reduced-motion: reduce) {
+                    .walking-anim img,
+                    .walking-anim .fake-shadow,
+                    .angry-anim img {
+                        animation: none !important;
+                    }
+                }
+                
                 .walking-anim img {
-                    animation: walkWaddle 0.5s infinite alternate ease-in-out;
+                    animation: walkWaddle 0.8s infinite alternate ease-in-out; /* Slowed from 0.5s */
                 }
                 .walking-anim .fake-shadow {
-                    animation: shadowPulse 0.5s infinite alternate ease-in-out;
+                    animation: shadowPulse 0.8s infinite alternate ease-in-out; /* Slowed from 0.5s */
                 }
                 .sitting-pose img {
                     transform: scaleY(0.9) translateY(4px);
@@ -310,22 +321,22 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
                     opacity: 1 !important;
                 }
                 .angry-anim img {
-                    animation: angryShake 0.15s infinite ease-in-out;
+                    animation: angryShake 0.25s infinite ease-in-out; /* Slowed from 0.15s */
                     filter: saturate(1.5) contrast(1.2);
                 }
 
                 @keyframes walkWaddle {
-                    0% { transform: translateY(0) rotate(-3deg) scaleY(1); }
-                    100% { transform: translateY(-3px) rotate(3deg) scaleY(0.98); }
+                    0% { transform: translateY(0) rotate(-2deg) scaleY(1); } /* Reduced rotation */
+                    100% { transform: translateY(-2px) rotate(2deg) scaleY(0.99); }
                 }
                 @keyframes shadowPulse {
-                    0% { transform: translateX(-50%) scale(1); opacity: 0.2; }
-                    100% { transform: translateX(-50%) scale(0.8); opacity: 0.1; }
+                    0% { transform: translateX(-50%) scale(1); opacity: 0.15; }
+                    100% { transform: translateX(-50%) scale(0.9); opacity: 0.1; }
                 }
                 @keyframes angryShake {
                     0% { transform: translateX(0) rotate(0deg); }
-                    25% { transform: translateX(-2px) rotate(-5deg); }
-                    75% { transform: translateX(2px) rotate(5deg); }
+                    25% { transform: translateX(-1px) rotate(-3deg); } /* Reduced intensity */
+                    75% { transform: translateX(1px) rotate(3deg); }
                     100% { transform: translateX(0) rotate(0deg); }
                 }
             `}</style>

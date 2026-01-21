@@ -1,10 +1,18 @@
 # Developer Log - NekoFit Project
-**Last Updated:** 2026-01-20 21:00
-**Status:** Favorite Menu Implemented, Optimized & Bug Fixed
+**Last Updated:** 2026-01-20 21:40
+**Status:** Favorite Menu Implemented, iOS Performance Optimized (Pending Verification)
 
 ---
 
 ## ✅ Completed Today (Session 6 - Jan 20)
+
+### 4. iOS Performance Optimization (Pending Verification)
+- **Problem**: Laggy performance on iPhone/Chrome due to heavy CSS effects.
+- **Fixes Applied**:
+    - **MovingBackground**: Disabled infinite animation on mobile devices.
+    - **PetSmartWalk**: Reduced animation frequency (0.5s -> 0.8s) and intensity. Added `prefers-reduced-motion` support.
+    - **Images**: Added `loading="lazy"` and `decoding="async"`.
+- **Next Step**: Detailed verification on actual device.
 
 ### 1. Favorite Menu Feature (เมนูที่ถูกใจ)
 - **Feature**: Added "Favorite Menu" system for quick logging.
@@ -25,6 +33,24 @@
 - **Portion Control Fix**: Fixed `invalid input syntax for type integer` error by forcing `Math.round()` on all nutritional values before saving.
 - **Duplicate Favorites**: Added UNIQUE constraint on `(user_id, name)` to prevent duplicate entries.
 - **Z-Index Fixes**: Fixed modal layering issues where Favorite modal appeared behind Add modal.
+
+### 4. iOS Performance Optimization (In Progress)
+- **Problem**: Significant UI lag reported on iPhone (Chrome/Safari).
+- **Analysis**: Caused by heavy `backdrop-blur` usage (CPU-bound on iOS) and infinite CSS animations.
+- **Fixes Applied (localy - not pushed)**:
+    - **MovingBackground**: Disabled infinite pattern animation on mobile devices.
+    - **PetSmartWalk**: Reduced animation frequency (0.5s -> 0.8s) and usage of `prefers-reduced-motion`.
+    - **Images**: Added `loading="lazy"` and `decoding="async"` to heavy resources.
+- **Pending**: Monitoring `backdrop-blur` impact. If lag persists, will implement GPU forcing or disable blur on mobile.
+
+### 4. iOS Performance Optimization (In Progress)
+- **Problem**: Significant UI lag reported on iPhone (Chrome/Safari).
+- **Analysis**: Caused by heavy `backdrop-blur` usage (CPU-bound on iOS) and infinite CSS animations.
+- **Fixes Applied (localy - not pushed)**:
+    - **MovingBackground**: Disabled infinite pattern animation on mobile devices.
+    - **PetSmartWalk**: Reduced animation frequency (0.5s -> 0.8s) and intensity. Added `prefers-reduced-motion` support.
+    - **Images**: Added `loading="lazy"` and `decoding="async"` to heavy resources.
+- **Pending**: Monitoring `backdrop-blur` impact. If lag persists, will implement GPU forcing or disable blur on mobile.
 
 ## ✅ Completed Today (Session 5 - Jan 19)
 
