@@ -1,6 +1,33 @@
 # Developer Log - NekoFit Project
-**Last Updated:** 2026-01-20 21:40
-**Status:** Favorite Menu Implemented, iOS Performance Optimized (Pending Verification)
+**Last Updated:** 2026-01-21 20:05
+**Status:** Health Grade Calendar Integrated, UI Polish
+
+---
+
+## ✅ Completed Today (Session 7 - Jan 21)
+
+### 1. Health Grade Calendar Integration (ปฏิทินวินัย)
+- **Feature**: Integrated daily health grades into the calendar.
+- **Logic**: Calculates daily grade (A/B/C/F) based on Calories, Protein, Sugar, and Sodium.
+- **Visuals**:
+    - **Uniform Colors**: Uses Green for all logged days (A/B/C/F) to maintain cleanliness.
+    - **Tooltip**: Added [?] icon with hover tooltip explaining the 4 grading criteria.
+    - **Daily vs Weekly**: Clarified that Calendar = Daily Grade, Main Card = Weekly Average.
+
+### 2. UI Polish & Refinement
+- **Compact Water Tracker**:
+    - Reduced padding and element heights.
+    - Updated label to "250 มล. / แก้ว".
+- **Chatty Cat (PetSmartWalk)**:
+    - Added **10+ Random Messages** for the cat to speak while walking.
+    - Messages range from health reminders to encouragement.
+- **Header Refinement**:
+    - Removed redundant elements (ring, settings, dot).
+    - Changed "Remaining" to "Consumed" calories.
+
+### 3. Documentation
+- Updated `walkthrough.md` with new features.
+- Updated `task.md` status.
 
 ---
 
