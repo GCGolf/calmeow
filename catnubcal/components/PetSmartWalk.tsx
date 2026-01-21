@@ -7,6 +7,22 @@ interface PetSmartWalkProps {
     goalCalories: number;
 }
 
+const CAT_MESSAGES = [
+    "เจ้านายจ๋า... วันนี้กินข้าวยังเมี๊ยว? 🍣",
+    "อย่าลืมดื่มน้ำนะเมี๊ยว! 💧",
+    "วันนี้กินโปรตีนถึงเป้าไหมเมี๊ยว? 🍗",
+    "สู้ๆ น้าา เป็นกำลังใจให้..เมี๊ยว! ✌️",
+    "ขยับตัวบ่อยๆ ร่างกายแข็งแรงนะ! 🐾",
+    "อยากกินปลาทู...เมี๊ยวว 🐟",
+    "ดูแลตัวเองด้วยนะ รักเจ้านายที่สุด! 🥰",
+    "วันนี้ทำได้ดีมากเก่งสุดๆ! 🌟",
+    "พักผ่อนบ้าง..เป็นห่วงนะเมี๊ยว 🛌",
+    "ลดน้ำตาลหน่อยนะเพื่อสุขภาพที่ดี 🍬",
+    "กินผักเยอะๆ นะเมี๊ยว 🥦",
+    "รักนะ เมี๊ยวๆ จุ๊บๆ ❤️",
+    "ถ้าเหนื่อยก็พัก..มาเล่นกันเมี๊ยว 😺"
+];
+
 const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, goalCalories }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const directionWrapperRef = useRef<HTMLDivElement>(null);
@@ -94,7 +110,8 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
             await walkTo('80%', 4);
 
             if (!isAnimating.current || isGoalReached) break;
-            await sit('เจ้านายจ๋า... วันนี้กินข้าวยัง? 🍣', 3);
+            const msg1 = CAT_MESSAGES[Math.floor(Math.random() * CAT_MESSAGES.length)];
+            await sit(msg1, 3);
 
             if (!isAnimating.current || isGoalReached) break;
             // --- Phase 2: Walk to Left Side (20%) ---
@@ -105,13 +122,15 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
             await walkTo('20%', 5);
 
             if (!isAnimating.current || isGoalReached) break;
-            await sit('ถ้ายังไม่กิน... มาแบ่งปลาทูให้เค้าบ้างสิ! 😽', 3);
+            const msg2 = CAT_MESSAGES[Math.floor(Math.random() * CAT_MESSAGES.length)];
+            await sit(msg2, 3);
 
             // --- Phase 3: Walk to Center (50%) ---
             directionWrapperRef.current.style.transform = 'scaleX(1)';
             await wait(600);
             await walkTo('50%', 3);
-            await sit('รักนะ เมี๊ยวๆ ❤️', 3);
+            const msg3 = CAT_MESSAGES[Math.floor(Math.random() * CAT_MESSAGES.length)];
+            await sit(msg3, 3);
         }
     };
 

@@ -261,7 +261,7 @@ const Analytics: React.FC = () => {
       </div>
 
       {/* Consistency Calendar - [NEW] Feature */}
-      <ConsistencyCalendar logs={rawLogs} />
+      <ConsistencyCalendar logs={rawLogs} tdee={tdee} />
 
 
 
@@ -348,7 +348,7 @@ const Analytics: React.FC = () => {
                   <div className="w-full bg-slate-200 h-1.5 rounded-full mb-1.5">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${quest.status === 'success' ? 'bg-green-500' :
-                          quest.status === 'warning' ? 'bg-orange-400' : 'bg-red-500'
+                        quest.status === 'warning' ? 'bg-orange-400' : 'bg-red-500'
                         }`}
                       style={{ width: `${quest.progressPercent}%` }}
                     ></div>
@@ -356,7 +356,7 @@ const Analytics: React.FC = () => {
 
                   {/* Action Message */}
                   <p className={`text-[10px] font-medium ${quest.status === 'success' ? 'text-green-600' :
-                      quest.status === 'warning' ? 'text-orange-500' : 'text-red-500'
+                    quest.status === 'warning' ? 'text-orange-500' : 'text-red-500'
                     }`}>
                     {quest.status === 'success' ? '✅ ' : '🎯 '} {quest.message}
                   </p>

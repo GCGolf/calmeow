@@ -33,7 +33,7 @@ import { calculateHealthScore, determinePetState } from '../services/health-logi
 import { analyzeFoodImage } from '../services/n8n-service';
 import PetSmartWalk from './PetSmartWalk';
 import WaterTracker from './WaterTracker';
-import MenuRoulette from './MenuRoulette';
+import FoodList from './FoodList'; // [NEW]
 import Analytics from './Analytics';
 import MovingBackground from './MovingBackground';
 import { supabase } from '../services/supabaseClient';
@@ -402,14 +402,48 @@ const Dashboard: React.FC = () => {
     // Fetch Food Logs for selected date
     useEffect(() => {
         const fetchFoodLogs = async () => {
-            const userId = user?.id;
-            if (!userId) return;
-
             const startOfDay = new Date(selectedDate);
             startOfDay.setHours(0, 0, 0, 0);
             const endOfDay = new Date(selectedDate);
             endOfDay.setHours(23, 59, 59, 999);
 
+            // [CACHE-FIRST] Immediate Load from LocalStorage (Instant UI)
+            try {
+                const offlineLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
+                const filteredLogs = offlineLogs.filter((item: any) => {
+                    const itemDate = new Date(item.created_at);
+                    return itemDate >= startOfDay && itemDate <= endOfDay;
+                });
+
+                if (filteredLogs.length > 0) {
+                    const cacheLogs: FoodItem[] = filteredLogs.map((item: any) => ({
+                        id: item.id,
+                        name: item.name,
+                        calories: item.calories,
+                        protein: item.protein,
+                        carbs: item.carbs,
+                        fat: item.fat,
+                        timestamp: new Date(item.created_at).getTime(),
+                        meal: item.meal_type || 'Snack',
+                        imageUrl: item.image_url || undefined,
+                        fiber: 0,
+                        sugar: item.sugar || 0,
+                        sodium: item.sodium || 0,
+                        cholesterol: item.cholesterol || 0,
+                        servingSize: { unit: 'serving', quantity: 1 }
+                    }));
+                    setFoodLog(cacheLogs);
+                } else {
+                    setFoodLog([]); // Clear if no cache, to show empty state immediately
+                }
+            } catch (e) {
+                console.error("Cache load error", e);
+            }
+
+            const userId = user?.id;
+            if (!userId) return;
+
+            // Background Fetch from Supabase
             const { data, error } = await supabase
                 .from('food_logs')
                 .select('*')
@@ -417,7 +451,8 @@ const Dashboard: React.FC = () => {
                 .gte('created_at', startOfDay.toISOString())
                 .lte('created_at', endOfDay.toISOString());
 
-            if (data && data.length > 0) {
+            if (data) {
+                // Formatting logic reused
                 const formattedLogs: FoodItem[] = data.map(item => ({
                     id: item.id,
                     name: item.food_name,
@@ -434,35 +469,13 @@ const Dashboard: React.FC = () => {
                     cholesterol: item.cholesterol || 0,
                     servingSize: { unit: 'serving', quantity: 1 }
                 }));
-                setFoodLog(formattedLogs);
-            } else {
-                // FALLBACK: Load from LocalStorage
-                const offlineLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
-                const startOfDay = new Date(selectedDate); startOfDay.setHours(0, 0, 0, 0);
-                const endOfDay = new Date(selectedDate); endOfDay.setHours(23, 59, 59, 999);
 
-                const filteredLogs = offlineLogs.filter((item: any) => {
-                    const itemDate = new Date(item.created_at);
-                    return itemDate >= startOfDay && itemDate <= endOfDay;
-                });
-
-                const formattedLogs: FoodItem[] = filteredLogs.map((item: any) => ({
-                    id: item.id,
-                    name: item.name,
-                    calories: item.calories,
-                    protein: item.protein,
-                    carbs: item.carbs,
-                    fat: item.fat,
-                    timestamp: new Date(item.created_at).getTime(),
-                    meal: item.meal_type || 'Snack',
-                    imageUrl: item.image_url || undefined,
-                    fiber: 0,
-                    sugar: 0,
-                    sodium: 0,
-                    cholesterol: 0,
-                    servingSize: { unit: 'serving', quantity: 1 }
-                }));
+                // Compare with current state to avoid unnecessary re-render if identical? 
+                // For now, just set it to ensure Freshness
                 setFoodLog(formattedLogs);
+
+                // [OPTIONAL] Sync back to offline cache to keep it fresh?
+                // Might be too expensive to do on every read. Keeping it simple.
             }
         };
         fetchFoodLogs();
@@ -579,9 +592,12 @@ const Dashboard: React.FC = () => {
                 created_at: logDate.toISOString()
             };
 
-            const offlineLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
-            offlineLogs.push(offlineEntry);
-            localStorage.setItem('offline_food_logs', JSON.stringify(offlineLogs));
+            // Defer localStorage write
+            setTimeout(() => {
+                const logs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
+                logs.push(offlineEntry);
+                localStorage.setItem('offline_food_logs', JSON.stringify(logs));
+            }, 0);
 
             const newFood: FoodItem = {
                 id: offlineEntry.id,
@@ -643,10 +659,13 @@ const Dashboard: React.FC = () => {
             console.error("Error saving food log:", error);
 
             // FALLBACK: Save to LocalStorage
-            const offlineLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
             const offlineEntry = { ...newEntry, id: crypto.randomUUID() };
-            offlineLogs.push(offlineEntry);
-            localStorage.setItem('offline_food_logs', JSON.stringify(offlineLogs));
+            // Defer localStorage write
+            setTimeout(() => {
+                const logs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
+                logs.push(offlineEntry);
+                localStorage.setItem('offline_food_logs', JSON.stringify(logs));
+            }, 0);
 
             console.log("Saved food log to Offline Storage");
 
@@ -749,16 +768,19 @@ const Dashboard: React.FC = () => {
         }
 
         // Update Local Storage (Offline Mirror)
-        try {
-            const offlineLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
-            const logIndex = offlineLogs.findIndex((l: any) => l.id === selectedFood.id);
-            if (logIndex >= 0) {
-                offlineLogs[logIndex] = { ...offlineLogs[logIndex], ...updatedFields };
-                localStorage.setItem('offline_food_logs', JSON.stringify(offlineLogs));
+        // Update Local Storage (Offline Mirror)
+        setTimeout(() => {
+            try {
+                const offlineLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
+                const logIndex = offlineLogs.findIndex((l: any) => l.id === selectedFood.id);
+                if (logIndex >= 0) {
+                    offlineLogs[logIndex] = { ...offlineLogs[logIndex], ...updatedFields };
+                    localStorage.setItem('offline_food_logs', JSON.stringify(offlineLogs));
+                }
+            } catch (e) {
+                console.error("Error updating offline logs", e);
             }
-        } catch (e) {
-            console.error("Error updating offline logs", e);
-        }
+        }, 0);
 
         // Update UI
         const updatedFood = {
@@ -824,77 +846,37 @@ const Dashboard: React.FC = () => {
                 {/* Top Row: Greeting + Progress Ring + Settings - Unified Glass Card (Flattened for Performance) */}
                 <div className="bg-gradient-to-br from-white/95 via-white/90 to-orange-50/50 rounded-[2rem] p-5 border border-white/60 shadow-[0_8px_32px_rgba(255,100,100,0.1)] mb-5 relative overflow-hidden group hover:shadow-[0_10px_40px_rgba(255,100,100,0.15)] transition-all duration-500">
 
-                    <div className="flex justify-between items-start relative z-10">
-                        {/* Left Side: Greeting & Calorie Status */}
-                        <div className="flex-1">
-                            {/* Greeting Badge */}
-                            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-50 to-rose-50 px-3 py-1.5 rounded-full mb-3 border border-white/60">
-                                <Sparkles className="w-3.5 h-3.5 text-orange-500" />
-                                <span className="text-xs font-bold text-orange-600 tracking-wide">
-                                    {new Date().getHours() < 12 ? 'สวัสดีตอนเช้า ☀️' : new Date().getHours() < 18 ? 'สวัสดีตอนบ่าย 🌤️' : 'สวัสดีตอนเย็น 🌙'}
-                                </span>
-                            </div>
-
-                            {/* Name with Online Status */}
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className="relative flex h-3 w-3">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                                </span>
-                                <h1 className="font-header text-3xl font-bold leading-tight uppercase tracking-[0.15em] text-slate-700/90 drop-shadow-sm">
-                                    {userStats.name}
-                                    {remainingCalories > 0 && remainingCalories < 500 && <span className="ml-2 inline-block animate-bounce text-orange-500">🔥</span>}
-                                    {remainingCalories <= 0 && <span className="ml-2 inline-block animate-bounce">🎉</span>}
-                                </h1>
-                            </div>
-
-                            {/* Calorie Status */}
-                            <div className="flex items-center gap-2 text-sm">
-                                {remainingCalories > 0 ? (
-                                    <>
-                                        <span className="text-slate-500 font-medium">เหลืออีก</span>
-                                        <span className="font-header font-bold text-orange-500">{remainingCalories}</span>
-                                        <span className="text-slate-500 font-medium">kcal</span>
-                                    </>
-                                ) : (
-                                    <span className="font-bold text-green-500 flex items-center gap-2">
-                                        ✨ ทำได้สำเร็จวันนี้!
-                                    </span>
-                                )}
-                            </div>
+                    <div className="flex flex-col items-center text-center relative z-10">
+                        {/* Greeting Badge */}
+                        <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-50 to-rose-50 px-4 py-1.5 rounded-full mb-3 border border-white/60 shadow-sm">
+                            <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                            <span className="text-xs font-bold text-orange-600 tracking-wide">
+                                {new Date().getHours() < 12 ? 'สวัสดีตอนเช้า ☀️' : new Date().getHours() < 18 ? 'สวัสดีตอนบ่าย 🌤️' : 'สวัสดีตอนเย็น 🌙'}
+                            </span>
                         </div>
 
-                        {/* Right Side: Progress Ring & Settings */}
-                        <div className="flex flex-col items-end gap-3">
-                            <div className="flex items-center gap-2">
-                                {/* Progress Ring */}
-                                <div className="relative w-12 h-12">
-                                    <svg className="w-full h-full -rotate-90 drop-shadow-sm">
-                                        <circle cx="24" cy="24" r="20" fill="transparent" stroke="rgba(255,255,255,0.5)" strokeWidth="4" />
-                                        <circle
-                                            cx="24" cy="24" r="20" fill="transparent" stroke="url(#progressGradient)" strokeWidth="4"
-                                            strokeDasharray={126}
-                                            strokeDashoffset={126 - (126 * Math.min(1, currentDayStats.calories / userStats.tdee))}
-                                            strokeLinecap="round"
-                                            className="transition-all duration-700"
-                                        />
-                                        <defs>
-                                            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                                <stop offset="0%" stopColor="#FB923C" />
-                                                <stop offset="100%" stopColor="#F472B6" />
-                                            </linearGradient>
-                                        </defs>
-                                    </svg>
-                                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-600/80">
-                                        {Math.round((currentDayStats.calories / userStats.tdee) * 100)}%
-                                    </span>
-                                </div>
+                        {/* Name */}
+                        <div className="flex items-center gap-2 mb-2 justify-center">
+                            <h1 className="font-header text-4xl font-black leading-tight uppercase tracking-[0.15em] text-slate-700/90 drop-shadow-sm bg-clip-text text-transparent bg-gradient-to-br from-slate-700 to-slate-500">
+                                {userStats.name}
+                            </h1>
+                            {remainingCalories > 0 && remainingCalories < 500 && <span className="text-2xl animate-bounce">🔥</span>}
+                            {remainingCalories <= 0 && <span className="text-2xl animate-bounce">🎉</span>}
+                        </div>
 
-                                {/* Settings Button */}
-                                <button onClick={() => navigate('/profile')} className="w-10 h-10 bg-white/80 rounded-xl flex items-center justify-center border border-white/60 text-slate-400 hover:text-rose-500 hover:bg-white transition-all shadow-sm">
-                                    <Settings className="w-4 h-4" />
-                                </button>
-                            </div>
+                        {/* Calorie Status - Extended */}
+                        <div className="flex items-center gap-3 text-sm text-slate-500 font-medium">
+                            {remainingCalories > 0 ? (
+                                <>
+                                    <span>กินไปแล้ว <span className="font-header font-bold text-orange-500 text-lg">{currentDayStats.calories}</span> kcal</span>
+                                    <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                                    <span className="text-xs opacity-70">เป้าหมาย {userStats.tdee}</span>
+                                </>
+                            ) : (
+                                <span className="font-bold text-green-500 flex items-center gap-2">
+                                    ✨ เป้าหมายวันนี้สำเร็จแล้ว!
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1117,8 +1099,6 @@ const Dashboard: React.FC = () => {
 
                 {activeTab === 'diary' && (
                     <div className="space-y-8 pb-20">
-                        {/* Menu Roulette (Gamification) */}
-                        <MenuRoulette remainingCalories={remainingCalories} />
 
                         <div className="bg-white p-8 rounded-[3rem] border border-[#F1EFE9] shadow-[0_20px_40px_rgba(0,0,0,0.02)] flex justify-between items-center">
                             <div className="space-y-1">
@@ -1130,51 +1110,8 @@ const Dashboard: React.FC = () => {
                             </button>
                         </div>
 
-
-
-                        <div className="space-y-6">
-                            {foodLog.length === 0 ? (
-                                <div className="py-24 flex flex-col items-center justify-center text-slate-200">
-                                    <UtensilsCrossed className="w-16 h-16 opacity-10 mb-4" />
-                                    <p className="text-xs font-black uppercase tracking-[0.2em]">ไม่มีรายการของวันที่เลือก</p>
-                                </div>
-                            ) : (
-                                foodLog.map((food) => (
-                                    <div key={food.id} onClick={() => setSelectedFood(food)} className="bg-white p-5 rounded-[2.8rem] border border-[#F1EFE9] shadow-[0_8px_30px_rgba(0,0,0,0.02)] flex flex-col gap-4 cursor-pointer active:scale-[0.98] transition-all hover:border-[#E88D67]/30">
-                                        <div className="flex items-center gap-5">
-                                            <div className="w-24 h-24 bg-[#FAF8F6] rounded-[2rem] flex items-center justify-center text-2xl border border-slate-100 overflow-hidden shadow-inner flex-shrink-0">
-                                                {food.imageUrl ? <img src={food.imageUrl} className="w-full h-full object-cover" alt={food.name} /> : <div className="text-slate-200"><UtensilsCrossed className="w-8 h-8" /></div>}
-                                            </div>
-                                            <div className="flex-1 space-y-2">
-                                                <div className="flex justify-between items-start">
-                                                    <div>
-                                                        <span className="text-[9px] font-black text-[#E88D67] uppercase tracking-[0.15em] block mb-1">{food.meal}</span>
-                                                        <h4 className="font-black text-slate-800 text-base leading-tight">{food.name}</h4>
-                                                    </div>
-                                                    <ChevronRight className="w-5 h-5 text-slate-200" />
-                                                </div>
-                                                <div className="flex items-baseline gap-1">
-                                                    <span className="text-xl font-black text-slate-800">{food.calories}</span>
-                                                    <span className="text-[10px] font-bold text-slate-300 uppercase">kcal</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-3 gap-2 px-1">
-                                            {[
-                                                { label: 'P', val: food.protein, color: 'bg-cyan-50 border-cyan-200', icon: '🥩' },
-                                                { label: 'C', val: food.carbs, color: 'bg-amber-50 border-amber-200', icon: '🌾' },
-                                                { label: 'F', val: food.fat, color: 'bg-lime-50 border-lime-200', icon: '💧' }
-                                            ].map(m => (
-                                                <div key={m.label} className={`${m.color} rounded-2xl py-2 px-2 flex items-center justify-center gap-1.5 border`}>
-                                                    <span className="text-sm">{m.icon}</span>
-                                                    <span className="text-[10px] font-black text-slate-700">{m.val}g</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
+                        {/* [MODIFIED] Use Extracted FoodList Component */}
+                        <FoodList foodLog={foodLog} onSelect={setSelectedFood} />
                     </div>
                 )}
 
