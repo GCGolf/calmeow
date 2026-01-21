@@ -24,7 +24,8 @@ import {
     Edit3,
     Beef,
     Wheat,
-    GlassWater
+    GlassWater,
+    Edit // [NEW] Added Edit Icon
 } from 'lucide-react';
 import { FoodItem, UserStats, PetState } from '../types';
 import { INITIAL_USER_STATS, MOCK_DAILY_LOGS } from '../mockData';
@@ -60,6 +61,7 @@ const Dashboard: React.FC = () => {
     const [showFavoriteModal, setShowFavoriteModal] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
     const [showManualForm, setShowManualForm] = useState(false); // Toggle manual entry form
+    const [showPortionInput, setShowPortionInput] = useState(false); // [NEW] Custom portion input state
 
     // Check if current food is favorited when selectedFood changes
     useEffect(() => {
@@ -190,13 +192,21 @@ const Dashboard: React.FC = () => {
         setShowAddModal(false);
     };
 
-    // Generate 7 days centered around Today
+    const dateScrollRef = useRef<HTMLDivElement>(null); // [NEW] Ref for date scroll container
+
+    // [MODIFIED] Generate Full Month Dates based on selectedDate
     const dateButtons = useMemo(() => {
         const dates = [];
+        const currentSelected = new Date(selectedDate);
+        const year = currentSelected.getFullYear();
+        const month = currentSelected.getMonth();
         const today = new Date();
-        for (let i = -3; i <= 3; i++) {
-            const d = new Date();
-            d.setDate(today.getDate() + i);
+
+        // Get total days in month
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        for (let i = 1; i <= daysInMonth; i++) {
+            const d = new Date(year, month, i);
             dates.push({
                 full: d.toLocaleDateString('en-CA'),
                 dayName: d.toLocaleDateString('th-TH', { weekday: 'short' }),
@@ -205,7 +215,17 @@ const Dashboard: React.FC = () => {
             });
         }
         return dates;
-    }, []);
+    }, [selectedDate]);
+
+    // [NEW] Auto-scroll to selected date
+    useEffect(() => {
+        if (dateScrollRef.current) {
+            const selectedBtn = dateScrollRef.current.querySelector('.selected-date-btn');
+            if (selectedBtn) {
+                selectedBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+        }
+    }, [selectedDate, activeTab]);
 
     const manualFormRef = useRef<HTMLFormElement>(null);
     const manualImageInputRef = useRef<HTMLInputElement>(null);
@@ -801,14 +821,14 @@ const Dashboard: React.FC = () => {
             <header className={`px-6 pt-10 pb-6 bg-white/30 backdrop-blur-xl rounded-b-[3.5rem] shadow-[0_20px_60px_-15px_rgba(232,141,103,0.15)] border-b border-white/60 ${activeTab === 'analytics' ? 'hidden' : ''}`}>
 
                 {/* Top Row: Greeting + Progress Ring + Settings */}
-                {/* Top Row: Greeting + Progress Ring + Settings - Unified Glass Card */}
-                <div className="bg-gradient-to-br from-white/80 via-white/50 to-orange-100/30 backdrop-blur-xl rounded-[2rem] p-5 border border-white/60 shadow-[0_8px_32px_rgba(255,100,100,0.1)] mb-5 relative overflow-hidden group hover:shadow-[0_10px_40px_rgba(255,100,100,0.15)] transition-all duration-500">
+                {/* Top Row: Greeting + Progress Ring + Settings - Unified Glass Card (Flattened for Performance) */}
+                <div className="bg-gradient-to-br from-white/95 via-white/90 to-orange-50/50 rounded-[2rem] p-5 border border-white/60 shadow-[0_8px_32px_rgba(255,100,100,0.1)] mb-5 relative overflow-hidden group hover:shadow-[0_10px_40px_rgba(255,100,100,0.15)] transition-all duration-500">
 
                     <div className="flex justify-between items-start relative z-10">
                         {/* Left Side: Greeting & Calorie Status */}
                         <div className="flex-1">
                             {/* Greeting Badge */}
-                            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-50/80 to-rose-50/80 px-3 py-1.5 rounded-full mb-3 border border-white/60 backdrop-blur-sm">
+                            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-50 to-rose-50 px-3 py-1.5 rounded-full mb-3 border border-white/60">
                                 <Sparkles className="w-3.5 h-3.5 text-orange-500" />
                                 <span className="text-xs font-bold text-orange-600 tracking-wide">
                                     {new Date().getHours() < 12 ? 'สวัสดีตอนเช้า ☀️' : new Date().getHours() < 18 ? 'สวัสดีตอนบ่าย 🌤️' : 'สวัสดีตอนเย็น 🌙'}
@@ -871,7 +891,7 @@ const Dashboard: React.FC = () => {
                                 </div>
 
                                 {/* Settings Button */}
-                                <button onClick={() => navigate('/profile')} className="w-10 h-10 bg-white/40 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/60 text-slate-400 hover:text-rose-500 hover:bg-white/60 hover:border-rose-200 transition-all shadow-sm">
+                                <button onClick={() => navigate('/profile')} className="w-10 h-10 bg-white/80 rounded-xl flex items-center justify-center border border-white/60 text-slate-400 hover:text-rose-500 hover:bg-white transition-all shadow-sm">
                                     <Settings className="w-4 h-4" />
                                 </button>
                             </div>
@@ -881,9 +901,9 @@ const Dashboard: React.FC = () => {
 
                 {/* Streak + Weight Journey Row */}
                 <div className="flex gap-3 mb-5">
-                    {/* Streak Counter - Glass Gradient */}
-                    <div className="flex-[1.5] bg-gradient-to-br from-orange-400/90 to-rose-400/90 backdrop-blur-sm p-4 rounded-[2rem] flex items-center gap-3 shadow-[0_10px_30px_rgba(244,63,94,0.2)] border border-white/20">
-                        <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-md border border-white/30">
+                    {/* Streak Counter - High Opacity Gradient (No Blur) */}
+                    <div className="flex-[1.5] bg-gradient-to-br from-orange-400/95 to-rose-400/95 p-4 rounded-[2rem] flex items-center gap-3 shadow-[0_10px_30px_rgba(244,63,94,0.2)] border border-white/20">
+                        <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center border border-white/30">
                             <span className="text-2xl drop-shadow-md">🔥</span>
                         </div>
                         <div>
@@ -892,8 +912,8 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Weight Journey - Motivation Mode */}
-                    <div className="flex-1 bg-white/40 backdrop-blur-md p-3 rounded-[2rem] flex flex-col justify-center pl-5 border border-white/60 shadow-sm relative overflow-hidden group">
+                    {/* Weight Journey - Solid/High Opacity (No Blur) */}
+                    <div className="flex-1 bg-white/80 p-3 rounded-[2rem] flex flex-col justify-center pl-5 border border-white/60 shadow-sm relative overflow-hidden group">
                         <div className="relative z-10">
                             <p className="text-[10px] font-bold text-cyan-600 uppercase tracking-wider mb-0.5 flex items-center gap-1">
                                 {currentWeight && targetWeight ? (
@@ -915,8 +935,9 @@ const Dashboard: React.FC = () => {
                 </div>
 
                 {/* Date Calendar Strip - Glass */}
-                <div className="bg-white/40 backdrop-blur-xl p-5 rounded-[2rem] border border-white/60 shadow-[0_10px_40px_-5px_rgba(0,0,0,0.03)]">
-                    <div className="flex items-center justify-between mb-4">
+                {/* Date Calendar Strip - High Opacity (No inner blur) */}
+                <div className="bg-white/80 p-3 rounded-[2rem] border border-white/60 shadow-[0_10px_40px_-5px_rgba(0,0,0,0.03)]">
+                    <div className="flex items-center justify-between mb-4 px-2">
                         <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-rose-400" />
                             <span className="font-header text-sm font-medium text-slate-600">
@@ -927,18 +948,22 @@ const Dashboard: React.FC = () => {
                             {selectedDate === new Date().toLocaleDateString('en-CA') ? '📍 วันนี้' : new Date(selectedDate).toLocaleDateString('th-TH', { weekday: 'long' })}
                         </span>
                     </div>
-                    <div className="flex justify-between items-center gap-1.5">
+                    {/* [MODIFIED] Scrollable Container with reduced gap */}
+                    <div ref={dateScrollRef} className="flex overflow-x-auto gap-1 pb-2 snap-x snap-mandatory scroll-smooth hide-scrollbar px-1">
                         {dateButtons.map((d) => {
                             const isSelected = selectedDate === d.full;
                             return (
-                                <button key={d.full} onClick={() => setSelectedDate(d.full)}
-                                    className={`flex flex-col items-center justify-center flex-1 py-3 rounded-xl transition-all duration-300 relative group ${isSelected
-                                        ? 'bg-gradient-to-b from-orange-400 to-rose-400 text-white shadow-[0_8px_20px_rgba(244,63,94,0.3)] scale-110 z-10 border border-white/20'
-                                        : 'bg-white/30 text-slate-400 border border-transparent hover:border-rose-200 hover:bg-rose-50/30'}`}
+                                <button
+                                    key={d.full}
+                                    onClick={() => setSelectedDate(d.full)}
+                                    // [MODIFIED] Width reduced to ~11.5vw (max 3.2rem) to squeeze 7 items
+                                    className={`flex-shrink-0 w-[11.5vw] max-w-[3.2rem] flex flex-col items-center justify-center py-2.5 rounded-xl transition-all duration-300 relative group snap-center ${isSelected
+                                        ? 'selected-date-btn bg-gradient-to-b from-orange-400 to-rose-400 text-white shadow-[0_8px_20px_rgba(244,63,94,0.3)] scale-110 z-10 border border-white/20'
+                                        : 'bg-white/30 text-slate-400 border border-transparent'}`}
                                 >
-                                    <span className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${isSelected ? 'text-white/80' : 'text-slate-400 group-hover:text-rose-400'}`}>{d.dayName}</span>
-                                    <span className={`font-header text-base font-bold ${isSelected ? '' : 'group-hover:text-rose-400'}`}>{d.dateNum}</span>
-                                    {d.isToday && !isSelected && <div className="absolute -bottom-1 w-1.5 h-1.5 bg-rose-400 rounded-full animate-pulse" />}
+                                    <span className={`text-[8px] font-bold uppercase tracking-wider mb-0.5 ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>{d.dayName}</span>
+                                    <span className={`font-header text-sm font-bold ${isSelected ? '' : ''}`}>{d.dateNum}</span>
+                                    {d.isToday && !isSelected && <div className="absolute -bottom-1 w-1 h-1 bg-rose-400 rounded-full animate-pulse" />}
                                 </button>
                             );
                         })}
@@ -1238,9 +1263,17 @@ const Dashboard: React.FC = () => {
                                 />
 
                                 {/* Center Label */}
-                                <div className="absolute inset-0 m-auto w-5 h-5 bg-white rounded-full z-20 flex items-center justify-center shadow-sm pointer-events-none">
-                                    <span className="text-[8px] font-black text-slate-700">{Math.round(portion * 100)}</span>
-                                </div>
+                                {/* Center Label (Clickable for Custom Input) */}
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setShowPortionInput(true); }}
+                                    className="absolute inset-0 m-auto w-5 h-5 bg-white rounded-full z-20 flex items-center justify-center shadow-sm cursor-pointer hover:scale-110 active:scale-90 transition-all border border-slate-100"
+                                >
+                                    {portion >= 10 ? (
+                                        <span className="text-[6px] font-black text-slate-700">x{portion}</span>
+                                    ) : (
+                                        <span className="text-[8px] font-black text-slate-700">{Math.round(portion * 100)}</span>
+                                    )}
+                                </button>
                             </div>
                         </div>
                         <div className="bg-[#FAF8F6] rounded-[2.5rem] p-7 border border-slate-50 mb-6 flex flex-col items-center text-center">
@@ -1332,8 +1365,8 @@ const Dashboard: React.FC = () => {
                                 <button
                                     onClick={() => setShowManualForm(!showManualForm)}
                                     className={`flex flex-col items-center justify-center gap-2 w-full p-8 border-2 text-slate-800 rounded-[2.5rem] font-black shadow-sm transition-all active:scale-95 ${showManualForm
-                                            ? 'bg-slate-100 border-slate-200'
-                                            : 'bg-white border-slate-100 hover:bg-slate-50'
+                                        ? 'bg-slate-100 border-slate-200'
+                                        : 'bg-white border-slate-100 hover:bg-slate-50'
                                         }`}
                                 >
                                     <ImageIcon className="w-8 h-8 text-[#7DA6C9]" />
@@ -1506,6 +1539,44 @@ const Dashboard: React.FC = () => {
                 onSelectFood={handleSelectFavorite}
                 userId={user?.id || ''}
             />
+            {/* [NEW] Custom Portion Input Modal */}
+            {showPortionInput && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6 animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h2 className="text-xl font-black text-slate-800">ระบุปริมาณเอง</h2>
+                                <p className="text-[10px] text-slate-400 font-medium">ใส่จำนวนที่ต้องการ (เช่น 1, 1.5, 3)</p>
+                            </div>
+                            <button onClick={() => setShowPortionInput(false)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100"><X className="w-5 h-5" /></button>
+                        </div>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            const formData = new FormData(e.target as HTMLFormElement);
+                            const val = parseFloat(formData.get('customPortion') as string);
+                            if (!isNaN(val) && val > 0) {
+                                setPortion(val);
+                                setShowPortionInput(false);
+                            }
+                        }}>
+                            <div className="space-y-4">
+                                <input
+                                    name="customPortion"
+                                    type="number"
+                                    step="0.1"
+                                    autoFocus
+                                    placeholder="1.0"
+                                    defaultValue={portion}
+                                    className="w-full px-6 py-4 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-orange-200 outline-none text-3xl font-black text-center text-slate-800 shadow-inner"
+                                />
+                                <button type="submit" className="w-full py-4 bg-gradient-to-r from-orange-400 to-rose-400 text-white rounded-2xl font-black text-sm shadow-lg shadow-orange-200/50 active:scale-95 transition-all uppercase tracking-widest">
+                                    ตกลง
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div >
     );
 };
