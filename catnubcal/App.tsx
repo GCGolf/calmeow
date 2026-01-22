@@ -16,14 +16,12 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center">
-        <div className="text-center">
-          <span className="text-6xl animate-bounce block mb-4">😺</span>
-          <p className="text-slate-500 font-medium">กำลังโหลด...</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center">
+      <div className="text-center flex flex-col items-center">
+        <img src="/headcat.png" alt="Loading" className="w-24 h-24 animate-bounce mb-4 object-contain drop-shadow-sm" />
+        <p className="text-slate-500 font-medium font-header tracking-wider">กำลังโหลด...</p>
       </div>
-    );
+    </div>
   }
 
   if (!user) {
@@ -38,14 +36,12 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center">
-        <div className="text-center">
-          <span className="text-6xl animate-bounce block mb-4">😺</span>
-          <p className="text-slate-500 font-medium">กำลังโหลด...</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 flex items-center justify-center">
+      <div className="text-center flex flex-col items-center">
+        <img src="/headcat.png" alt="Loading" className="w-24 h-24 animate-bounce mb-4 object-contain drop-shadow-sm" />
+        <p className="text-slate-500 font-medium font-header tracking-wider">กำลังโหลด...</p>
       </div>
-    );
+    </div>
   }
 
   if (user) {

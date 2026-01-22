@@ -57,11 +57,11 @@ const Dashboard: React.FC = () => {
     const [showWeightModal, setShowWeightModal] = useState(false);
     const [nutrientPage, setNutrientPage] = useState(0); // [NEW] Carousel page state (0 = Macros, 1 = Micros)
 
-    // [NEW] Favorite Menu State
     const [showFavoriteModal, setShowFavoriteModal] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
     const [showManualForm, setShowManualForm] = useState(false); // Toggle manual entry form
     const [showPortionInput, setShowPortionInput] = useState(false); // [NEW] Custom portion input state
+    const [isEditingMacros, setIsEditingMacros] = useState(false); // [NEW] Toggle Edit Mode
 
     // Check if current food is favorited when selectedFood changes
     useEffect(() => {
@@ -717,30 +717,38 @@ const Dashboard: React.FC = () => {
         setPreviewImage(null);
     };
 
-    // [NEW] Portion Control State
+    // [NEW] Portion Control & Manual Override State
     const [portion, setPortion] = useState(1); // 1.0 = 100%
     const [baseStats, setBaseStats] = useState<FoodItem | null>(null);
+    const [manualOverride, setManualOverride] = useState<{
+        calories?: number;
+        protein?: number;
+        carbs?: number;
+        fat?: number;
+    }>({});
 
     // Initialize Base Stats when opening Selected Food
     useEffect(() => {
         if (selectedFood) {
             setBaseStats(selectedFood);
             setPortion(1);
+            setManualOverride({}); // Reset overrides
         }
     }, [selectedFood]);
 
     // Update DB with new portion
     const handleUpdatePortion = async () => {
-        if (!selectedFood || !baseStats || portion === 1) {
+        const hasManualChanges = Object.keys(manualOverride).length > 0;
+        if (!selectedFood || !baseStats || (portion === 1 && !hasManualChanges)) {
             setSelectedFood(null); // Just close if no change
             return;
         }
 
         const userId = user?.id;
-        const newCalories = Math.round(baseStats.calories * portion);
-        const newProtein = Math.round(baseStats.protein * portion);
-        const newCarbs = Math.round(baseStats.carbs * portion);
-        const newFat = Math.round(baseStats.fat * portion);
+        const newCalories = manualOverride.calories ?? Math.round(baseStats.calories * portion);
+        const newProtein = manualOverride.protein ?? Math.round(baseStats.protein * portion);
+        const newCarbs = manualOverride.carbs ?? Math.round(baseStats.carbs * portion);
+        const newFat = manualOverride.fat ?? Math.round(baseStats.fat * portion);
         const newChol = Math.round(baseStats.cholesterol * portion);
         const newSugar = Math.round(baseStats.sugar * portion);
         const newSodium = Math.round(baseStats.sodium * portion);
@@ -792,20 +800,50 @@ const Dashboard: React.FC = () => {
         setSelectedFood(null); // Close modal
     };
 
-    // Calculate display values based on portion
+    // Calculate display values based on portion OR manual override
     const displayFood = useMemo(() => {
         if (!baseStats) return selectedFood;
+
+        // If nutrient is manually overridden, use it. Otherwise, calculate from portion.
+        const currentToUse = {
+            calories: manualOverride.calories ?? Math.round(baseStats.calories * portion),
+            protein: manualOverride.protein ?? Math.round(baseStats.protein * portion),
+            carbs: manualOverride.carbs ?? Math.round(baseStats.carbs * portion),
+            fat: manualOverride.fat ?? Math.round(baseStats.fat * portion),
+        };
+
         return {
             ...baseStats,
-            calories: Math.round(baseStats.calories * portion),
-            protein: Math.round(baseStats.protein * portion),
-            carbs: Math.round(baseStats.carbs * portion),
-            fat: Math.round(baseStats.fat * portion),
+            calories: currentToUse.calories,
+            protein: currentToUse.protein,
+            carbs: currentToUse.carbs,
+            fat: currentToUse.fat,
             cholesterol: Math.round(baseStats.cholesterol * portion),
             sugar: Math.round(baseStats.sugar * portion),
             sodium: Math.round(baseStats.sodium * portion),
         };
-    }, [baseStats, portion, selectedFood]);
+    }, [baseStats, portion, selectedFood, manualOverride]);
+
+    // Handle Manual Macro Change
+    const handleMacroChange = (field: 'protein' | 'carbs' | 'fat', value: string) => {
+        const numVal = parseFloat(value);
+        if (isNaN(numVal) || numVal < 0) return;
+
+        const newOverrides = { ...manualOverride, [field]: numVal };
+
+        // Auto-calculate calories based on changed macros + existing (or calculated) macros
+        // Formula: P*4 + C*4 + F*9
+        // We need to resolve the other macros (either from override or portion)
+        const resolve = (f: 'protein' | 'carbs' | 'fat') => newOverrides[f] ?? Math.round((baseStats?.[f] || 0) * portion);
+
+        const p = resolve('protein');
+        const c = resolve('carbs');
+        const f = resolve('fat');
+
+        newOverrides.calories = Math.round((p * 4) + (c * 4) + (f * 9));
+
+        setManualOverride(newOverrides);
+    };
 
     // Delete Food Item from Database/Offline Storage
     const handleDeleteFood = async (foodId: string) => {
@@ -1224,16 +1262,42 @@ const Dashboard: React.FC = () => {
                                 <div className="flex w-[200%]">
                                     {/* Page 1: Macros */}
                                     <div className="w-1/2 flex-shrink-0 snap-center px-1">
-                                        <div className="grid grid-cols-3 gap-3">
+                                        <div className="grid grid-cols-3 gap-3 relative">
+                                            {/* Edit Button (Top Right of Grid) */}
+                                            <button
+                                                onClick={() => setIsEditingMacros(!isEditingMacros)}
+                                                className={`absolute -top-3 -right-2 z-10 p-2 rounded-full shadow-sm border transition-all ${isEditingMacros ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-400 border-slate-100 hover:text-slate-600'}`}
+                                            >
+                                                <Edit3 className="w-3 h-3" />
+                                            </button>
+
                                             {[
-                                                { l: 'โปรตีน', v: displayFood?.protein, unit: 'g', color: 'bg-cyan-50 border-cyan-200', icon: '🥩' },
-                                                { l: 'คาร์โบ', v: displayFood?.carbs, unit: 'g', color: 'bg-amber-50 border-amber-200', icon: '🌾' },
-                                                { l: 'ไขมัน', v: displayFood?.fat, unit: 'g', color: 'bg-lime-50 border-lime-200', icon: '💧' }
+                                                { l: 'โปรตีน', id: 'protein' as const, v: displayFood?.protein, unit: 'g', color: 'bg-cyan-50 border-cyan-200', icon: '🥩', focusRing: 'focus:border-cyan-400 focus:bg-white' },
+                                                { l: 'คาร์โบ', id: 'carbs' as const, v: displayFood?.carbs, unit: 'g', color: 'bg-amber-50 border-amber-200', icon: '🌾', focusRing: 'focus:border-amber-400 focus:bg-white' },
+                                                { l: 'ไขมัน', id: 'fat' as const, v: displayFood?.fat, unit: 'g', color: 'bg-lime-50 border-lime-200', icon: '💧', focusRing: 'focus:border-lime-400 focus:bg-white' }
                                             ].map(x => (
-                                                <div key={x.l} className={`${x.color} p-4 rounded-[2rem] border flex flex-col items-center text-center shadow-sm`}>
+                                                <div key={x.l} className={`${x.color} p-4 rounded-[2rem] border flex flex-col items-center text-center shadow-sm relative group transition-all duration-300`}>
                                                     <span className="text-2xl mb-2">{x.icon}</span>
                                                     <span className="text-[9px] font-black text-slate-400 uppercase mb-1">{x.l}</span>
-                                                    <p className="text-lg font-black text-slate-800">{x.v}{x.unit}</p>
+
+                                                    {isEditingMacros ? (
+                                                        <div className="flex items-baseline justify-center gap-1 w-full">
+                                                            <input
+                                                                type="number"
+                                                                value={Math.round(x.v || 0).toString()}
+                                                                onChange={(e) => handleMacroChange(x.id, e.target.value)}
+                                                                className={`w-16 bg-white/50 text-center text-lg font-black text-slate-800 outline-none border border-transparent rounded-lg p-0 transition-all focus:bg-white focus:shadow-sm ${x.focusRing}`}
+                                                                placeholder="0"
+                                                                autoFocus={x.id === 'protein'}
+                                                            />
+                                                            <span className="text-xs font-bold text-slate-400">{x.unit}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-baseline justify-center gap-1">
+                                                            <span className="text-lg font-black text-slate-800">{Math.round(x.v || 0)}</span>
+                                                            <span className="text-xs font-bold text-slate-400">{x.unit}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
@@ -1271,7 +1335,7 @@ const Dashboard: React.FC = () => {
                     <div className="flex gap-3">
                         <button onClick={() => setSelectedFood(null)} className="flex-1 py-5 rounded-[1.5rem] bg-slate-100 text-slate-500 font-black uppercase tracking-widest text-[11px] hover:bg-slate-200 transition-all">ยกเลิก</button>
                         <button onClick={handleUpdatePortion} className="flex-[2] py-5 rounded-[1.5rem] bg-slate-800 text-white font-black uppercase tracking-widest text-[11px] shadow-xl active:scale-95 transition-all">
-                            {portion < 1 ? 'ยืนยันการลดปริมาณ' : 'ปิดหน้าต่าง'}
+                            {portion < 1 || Object.keys(manualOverride).length > 0 ? 'บันทึกการแก้ไข' : 'ปิดหน้าต่าง'}
                         </button>
                     </div>
                 </div>
