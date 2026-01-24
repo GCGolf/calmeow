@@ -1160,39 +1160,19 @@ const Dashboard: React.FC = () => {
 
                 {activeTab === 'diary' && (
                     <>
-                        <div className="bg-white/80 p-3 rounded-[2rem] border border-white/60 shadow-[0_10px_40px_-5px_rgba(0,0,0,0.03)] mb-6">
-                            <div className="flex items-center justify-between mb-4 px-2">
-                                <button
-                                    onClick={() => {
-                                        setPickerYear(new Date(selectedDate).getFullYear());
-                                        setShowMonthPicker(true);
-                                    }}
-                                    className="flex items-center gap-2 group cursor-pointer"
-                                >
-                                    <Calendar className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
-                                    <span className="font-header text-sm font-medium text-slate-600 group-hover:text-rose-500 transition-colors">
-                                        {new Date(selectedDate).toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })}
-                                    </span>
-                                </button>
-                                <span className="text-xs font-semibold text-rose-500 bg-rose-50/50 px-3 py-1.5 rounded-full border border-rose-100/50">
-                                    {selectedDate === new Date().toLocaleDateString('en-CA') ? '📍 วันนี้' : new Date(selectedDate).toLocaleDateString('th-TH', { weekday: 'long' })}
-                                </span>
-                            </div>
-                            <div className="space-y-8 pb-20">
-
-                                <div className="bg-white p-8 rounded-[3rem] border border-[#F1EFE9] shadow-[0_20px_40px_rgba(0,0,0,0.02)] flex justify-between items-center">
-                                    <div className="space-y-1">
-                                        <h3 className="text-xl font-black text-slate-800">บันทึกอาหาร</h3>
-                                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Food Log Progress</p>
-                                    </div>
-                                    <button onClick={openAddModal} className="bg-[#1A1C1E] text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl active:scale-90 transition-all">
-                                        <Plus className="w-7 h-7" />
-                                    </button>
+                        <div className="space-y-8 pb-20">
+                            <div className="bg-white p-8 rounded-[3rem] border border-[#F1EFE9] shadow-[0_20px_40px_rgba(0,0,0,0.02)] flex justify-between items-center">
+                                <div className="space-y-1">
+                                    <h3 className="text-xl font-black text-slate-800">บันทึกอาหาร</h3>
+                                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Food Log Progress</p>
                                 </div>
-
-                                {/* [MODIFIED] Use Extracted FoodList Component */}
-                                <FoodList foodLog={foodLog} onSelect={setSelectedFood} />
+                                <button onClick={openAddModal} className="bg-[#1A1C1E] text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl active:scale-90 transition-all">
+                                    <Plus className="w-7 h-7" />
+                                </button>
                             </div>
+
+                            {/* [MODIFIED] Use Extracted FoodList Component */}
+                            <FoodList foodLog={foodLog} onSelect={setSelectedFood} />
                         </div>
                     </>
                 )}
@@ -1228,274 +1208,277 @@ const Dashboard: React.FC = () => {
             </div>
 
             {/* Detail Modal */}
-            {selectedFood && (
-                <div className="fixed inset-0 z-[70] bg-white animate-in slide-in-from-bottom duration-500 overflow-y-auto max-w-md mx-auto shadow-2xl">
-                    <div className="relative h-[38vh] w-full overflow-hidden">
-                        <img src={selectedFood.imageUrl || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop"} alt="Food Detail" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                        <div className="absolute top-10 left-6 right-6 flex justify-between items-center">
-                            <button onClick={() => setSelectedFood(null)} className="w-10 h-10 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-slate-800 shadow-lg"><ChevronLeft className="w-6 h-6" /></button>
-                            <button onClick={() => handleDeleteFood(selectedFood.id)} className="w-10 h-10 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-red-500 shadow-lg"><Trash2 className="w-5 h-5" /></button>
-                        </div>
-                    </div>
-                    <div className="relative -mt-12 bg-white rounded-t-[3.5rem] px-7 pt-9 pb-24 min-h-[62vh] shadow-2xl">
-                        <div className="flex justify-between items-start mb-6 gap-4">
-                            <div className="flex items-center gap-3 flex-1">
-                                {/* [NEW] Heart Button (Moved to front) */}
-                                <button
-                                    onClick={handleToggleFavorite}
-                                    className={`w-10 h-10 rounded-full border flex items-center justify-center hover:scale-110 transition-all active:scale-90 shadow-sm shrink-0 ${isFavorite
-                                        ? 'bg-pink-100 border-pink-300 text-red-500'
-                                        : 'bg-slate-50 border-slate-200 text-slate-300'
-                                        }`}
-                                >
-                                    {isFavorite ? '❤️' : '🤍'}
-                                </button>
-                                <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-tight">{displayFood?.name}</h2>
-                            </div>
-
-                            {/* [RESTORED] Small Plate Portion Control */}
-                            <div className="relative w-12 h-12 shrink-0">
-                                {/* Background */}
-                                <div className="absolute inset-0 rounded-full border-2 border-slate-100 bg-slate-50"></div>
-
-                                {/* 4 Quadrants */}
-                                {/* Top-Right: 25% */}
-                                <button
-                                    onClick={() => setPortion(0.25)}
-                                    className={`absolute top-0 right-0 w-1/2 h-1/2 rounded-tr-full border-l border-b border-white z-10 active:scale-95 transition-all ${portion >= 0.25 ? 'bg-orange-400' : 'bg-slate-200'}`}
-                                />
-                                {/* Bottom-Right: 50% */}
-                                <button
-                                    onClick={() => setPortion(0.50)}
-                                    className={`absolute bottom-0 right-0 w-1/2 h-1/2 rounded-br-full border-l border-t border-white z-10 active:scale-95 transition-all ${portion >= 0.5 ? 'bg-orange-400' : 'bg-slate-200'}`}
-                                />
-                                {/* Bottom-Left: 75% */}
-                                <button
-                                    onClick={() => setPortion(0.75)}
-                                    className={`absolute bottom-0 left-0 w-1/2 h-1/2 rounded-bl-full border-r border-t border-white z-10 active:scale-95 transition-all ${portion >= 0.75 ? 'bg-orange-400' : 'bg-slate-200'}`}
-                                />
-                                {/* Top-Left: 100% */}
-                                <button
-                                    onClick={() => setPortion(1.0)}
-                                    className={`absolute top-0 left-0 w-1/2 h-1/2 rounded-tl-full border-r border-b border-white z-10 active:scale-95 transition-all ${portion >= 1 ? 'bg-orange-400' : 'bg-slate-200'}`}
-                                />
-
-                                {/* Center Label */}
-                                {/* Center Label (Clickable for Custom Input) */}
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setShowPortionInput(true); }}
-                                    className="absolute inset-0 m-auto w-5 h-5 bg-white rounded-full z-20 flex items-center justify-center shadow-sm cursor-pointer hover:scale-110 active:scale-90 transition-all border border-slate-100"
-                                >
-                                    {portion >= 10 ? (
-                                        <span className="text-[6px] font-black text-slate-700">x{portion}</span>
-                                    ) : (
-                                        <span className="text-[8px] font-black text-slate-700">{Math.round(portion * 100)}</span>
-                                    )}
-                                </button>
+            {
+                selectedFood && (
+                    <div className="fixed inset-0 z-[70] bg-white animate-in slide-in-from-bottom duration-500 overflow-y-auto max-w-md mx-auto shadow-2xl">
+                        <div className="relative h-[38vh] w-full overflow-hidden">
+                            <img src={selectedFood.imageUrl || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?q=80&w=1000&auto=format&fit=crop"} alt="Food Detail" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                            <div className="absolute top-10 left-6 right-6 flex justify-between items-center">
+                                <button onClick={() => setSelectedFood(null)} className="w-10 h-10 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-slate-800 shadow-lg"><ChevronLeft className="w-6 h-6" /></button>
+                                <button onClick={() => handleDeleteFood(selectedFood.id)} className="w-10 h-10 bg-white/90 backdrop-blur-md rounded-xl flex items-center justify-center text-red-500 shadow-lg"><Trash2 className="w-5 h-5" /></button>
                             </div>
                         </div>
-                        <div className="bg-[#FAF8F6] rounded-[2.5rem] p-7 border border-slate-50 mb-6 flex flex-col items-center text-center">
-                            <p className="text-5xl font-black text-slate-800">{displayFood?.calories} KCAL</p>
-                            {portion < 1 && <span className="text-xs font-bold text-orange-500 mt-2 bg-orange-50 px-3 py-1 rounded-full">ปรับลดปริมาณเหลือ {Math.round(portion * 100)}%</span>}
-                        </div>
-                        {/* Nutrition Carousel */}
-                        <div className="relative mb-8">
-                            {/* Carousel Container */}
-                            <div className="overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar">
-                                <div className="flex w-[200%]">
-                                    {/* Page 1: Macros */}
-                                    <div className="w-1/2 flex-shrink-0 snap-center px-1">
-                                        <div className="grid grid-cols-3 gap-3 relative">
-                                            {/* Edit Button (Top Right of Grid) */}
-                                            <button
-                                                onClick={() => setIsEditingMacros(!isEditingMacros)}
-                                                className={`absolute -top-3 -right-2 z-10 p-2 rounded-full shadow-sm border transition-all ${isEditingMacros ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-400 border-slate-100 hover:text-slate-600'}`}
-                                            >
-                                                <Edit3 className="w-3 h-3" />
-                                            </button>
+                        <div className="relative -mt-12 bg-white rounded-t-[3.5rem] px-7 pt-9 pb-24 min-h-[62vh] shadow-2xl">
+                            <div className="flex justify-between items-start mb-6 gap-4">
+                                <div className="flex items-center gap-3 flex-1">
+                                    {/* [NEW] Heart Button (Moved to front) */}
+                                    <button
+                                        onClick={handleToggleFavorite}
+                                        className={`w-10 h-10 rounded-full border flex items-center justify-center hover:scale-110 transition-all active:scale-90 shadow-sm shrink-0 ${isFavorite
+                                            ? 'bg-pink-100 border-pink-300 text-red-500'
+                                            : 'bg-slate-50 border-slate-200 text-slate-300'
+                                            }`}
+                                    >
+                                        {isFavorite ? '❤️' : '🤍'}
+                                    </button>
+                                    <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-tight">{displayFood?.name}</h2>
+                                </div>
 
-                                            {[
-                                                { l: 'โปรตีน', id: 'protein' as const, v: displayFood?.protein, unit: 'g', color: 'bg-cyan-50 border-cyan-200', icon: '🥩', focusRing: 'focus:border-cyan-400 focus:bg-white' },
-                                                { l: 'คาร์โบ', id: 'carbs' as const, v: displayFood?.carbs, unit: 'g', color: 'bg-amber-50 border-amber-200', icon: '🌾', focusRing: 'focus:border-amber-400 focus:bg-white' },
-                                                { l: 'ไขมัน', id: 'fat' as const, v: displayFood?.fat, unit: 'g', color: 'bg-lime-50 border-lime-200', icon: '💧', focusRing: 'focus:border-lime-400 focus:bg-white' }
-                                            ].map(x => (
-                                                <div key={x.l} className={`${x.color} p-4 rounded-[2rem] border flex flex-col items-center text-center shadow-sm relative group transition-all duration-300`}>
-                                                    <span className="text-2xl mb-2">{x.icon}</span>
-                                                    <span className="text-[9px] font-black text-slate-400 uppercase mb-1">{x.l}</span>
+                                {/* [RESTORED] Small Plate Portion Control */}
+                                <div className="relative w-12 h-12 shrink-0">
+                                    {/* Background */}
+                                    <div className="absolute inset-0 rounded-full border-2 border-slate-100 bg-slate-50"></div>
 
-                                                    {isEditingMacros ? (
-                                                        <div className="flex items-baseline justify-center gap-1 w-full">
-                                                            <input
-                                                                type="number"
-                                                                value={Math.round(x.v || 0).toString()}
-                                                                onChange={(e) => handleMacroChange(x.id, e.target.value)}
-                                                                className={`w-16 bg-white/50 text-center text-lg font-black text-slate-800 outline-none border border-transparent rounded-lg p-0 transition-all focus:bg-white focus:shadow-sm ${x.focusRing}`}
-                                                                placeholder="0"
-                                                                autoFocus={x.id === 'protein'}
-                                                            />
-                                                            <span className="text-xs font-bold text-slate-400">{x.unit}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-baseline justify-center gap-1">
-                                                            <span className="text-lg font-black text-slate-800">{Math.round(x.v || 0)}</span>
-                                                            <span className="text-xs font-bold text-slate-400">{x.unit}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
+                                    {/* 4 Quadrants */}
+                                    {/* Top-Right: 25% */}
+                                    <button
+                                        onClick={() => setPortion(0.25)}
+                                        className={`absolute top-0 right-0 w-1/2 h-1/2 rounded-tr-full border-l border-b border-white z-10 active:scale-95 transition-all ${portion >= 0.25 ? 'bg-orange-400' : 'bg-slate-200'}`}
+                                    />
+                                    {/* Bottom-Right: 50% */}
+                                    <button
+                                        onClick={() => setPortion(0.50)}
+                                        className={`absolute bottom-0 right-0 w-1/2 h-1/2 rounded-br-full border-l border-t border-white z-10 active:scale-95 transition-all ${portion >= 0.5 ? 'bg-orange-400' : 'bg-slate-200'}`}
+                                    />
+                                    {/* Bottom-Left: 75% */}
+                                    <button
+                                        onClick={() => setPortion(0.75)}
+                                        className={`absolute bottom-0 left-0 w-1/2 h-1/2 rounded-bl-full border-r border-t border-white z-10 active:scale-95 transition-all ${portion >= 0.75 ? 'bg-orange-400' : 'bg-slate-200'}`}
+                                    />
+                                    {/* Top-Left: 100% */}
+                                    <button
+                                        onClick={() => setPortion(1.0)}
+                                        className={`absolute top-0 left-0 w-1/2 h-1/2 rounded-tl-full border-r border-b border-white z-10 active:scale-95 transition-all ${portion >= 1 ? 'bg-orange-400' : 'bg-slate-200'}`}
+                                    />
+
+                                    {/* Center Label */}
+                                    {/* Center Label (Clickable for Custom Input) */}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowPortionInput(true); }}
+                                        className="absolute inset-0 m-auto w-5 h-5 bg-white rounded-full z-20 flex items-center justify-center shadow-sm cursor-pointer hover:scale-110 active:scale-90 transition-all border border-slate-100"
+                                    >
+                                        {portion >= 10 ? (
+                                            <span className="text-[6px] font-black text-slate-700">x{portion}</span>
+                                        ) : (
+                                            <span className="text-[8px] font-black text-slate-700">{Math.round(portion * 100)}</span>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="bg-[#FAF8F6] rounded-[2.5rem] p-7 border border-slate-50 mb-6 flex flex-col items-center text-center">
+                                <p className="text-5xl font-black text-slate-800">{displayFood?.calories} KCAL</p>
+                                {portion < 1 && <span className="text-xs font-bold text-orange-500 mt-2 bg-orange-50 px-3 py-1 rounded-full">ปรับลดปริมาณเหลือ {Math.round(portion * 100)}%</span>}
+                            </div>
+                            {/* Nutrition Carousel */}
+                            <div className="relative mb-8">
+                                {/* Carousel Container */}
+                                <div className="overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar">
+                                    <div className="flex w-[200%]">
+                                        {/* Page 1: Macros */}
+                                        <div className="w-1/2 flex-shrink-0 snap-center px-1">
+                                            <div className="grid grid-cols-3 gap-3 relative">
+                                                {/* Edit Button (Top Right of Grid) */}
+                                                <button
+                                                    onClick={() => setIsEditingMacros(!isEditingMacros)}
+                                                    className={`absolute -top-3 -right-2 z-10 p-2 rounded-full shadow-sm border transition-all ${isEditingMacros ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-400 border-slate-100 hover:text-slate-600'}`}
+                                                >
+                                                    <Edit3 className="w-3 h-3" />
+                                                </button>
+
+                                                {[
+                                                    { l: 'โปรตีน', id: 'protein' as const, v: displayFood?.protein, unit: 'g', color: 'bg-cyan-50 border-cyan-200', icon: '🥩', focusRing: 'focus:border-cyan-400 focus:bg-white' },
+                                                    { l: 'คาร์โบ', id: 'carbs' as const, v: displayFood?.carbs, unit: 'g', color: 'bg-amber-50 border-amber-200', icon: '🌾', focusRing: 'focus:border-amber-400 focus:bg-white' },
+                                                    { l: 'ไขมัน', id: 'fat' as const, v: displayFood?.fat, unit: 'g', color: 'bg-lime-50 border-lime-200', icon: '💧', focusRing: 'focus:border-lime-400 focus:bg-white' }
+                                                ].map(x => (
+                                                    <div key={x.l} className={`${x.color} p-4 rounded-[2rem] border flex flex-col items-center text-center shadow-sm relative group transition-all duration-300`}>
+                                                        <span className="text-2xl mb-2">{x.icon}</span>
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase mb-1">{x.l}</span>
+
+                                                        {isEditingMacros ? (
+                                                            <div className="flex items-baseline justify-center gap-1 w-full">
+                                                                <input
+                                                                    type="number"
+                                                                    value={Math.round(x.v || 0).toString()}
+                                                                    onChange={(e) => handleMacroChange(x.id, e.target.value)}
+                                                                    className={`w-16 bg-white/50 text-center text-lg font-black text-slate-800 outline-none border border-transparent rounded-lg p-0 transition-all focus:bg-white focus:shadow-sm ${x.focusRing}`}
+                                                                    placeholder="0"
+                                                                    autoFocus={x.id === 'protein'}
+                                                                />
+                                                                <span className="text-xs font-bold text-slate-400">{x.unit}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-baseline justify-center gap-1">
+                                                                <span className="text-lg font-black text-slate-800">{Math.round(x.v || 0)}</span>
+                                                                <span className="text-xs font-bold text-slate-400">{x.unit}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                    {/* Page 2: Micros */}
-                                    <div className="w-1/2 flex-shrink-0 snap-center px-1">
-                                        <div className="grid grid-cols-3 gap-3">
-                                            {[
-                                                { l: 'คอเลสเตอรอล', v: displayFood?.cholesterol, unit: 'mg', color: 'bg-yellow-50 border-yellow-200', icon: '🍳' },
-                                                { l: 'น้ำตาล', v: displayFood?.sugar, unit: 'g', color: 'bg-pink-50 border-pink-200', icon: '🍬' },
-                                                { l: 'โซเดียม', v: displayFood?.sodium, unit: 'mg', color: 'bg-purple-50 border-purple-200', icon: '🧂' }
-                                            ].map(x => (
-                                                <div key={x.l} className={`${x.color} p-4 rounded-[2rem] border flex flex-col items-center text-center shadow-sm`}>
-                                                    <span className="text-2xl mb-2">{x.icon}</span>
-                                                    <span className="text-[9px] font-black text-slate-400 uppercase mb-1">{x.l}</span>
-                                                    <p className="text-lg font-black text-slate-800">{x.v}{x.unit}</p>
-                                                </div>
-                                            ))}
+                                        {/* Page 2: Micros */}
+                                        <div className="w-1/2 flex-shrink-0 snap-center px-1">
+                                            <div className="grid grid-cols-3 gap-3">
+                                                {[
+                                                    { l: 'คอเลสเตอรอล', v: displayFood?.cholesterol, unit: 'mg', color: 'bg-yellow-50 border-yellow-200', icon: '🍳' },
+                                                    { l: 'น้ำตาล', v: displayFood?.sugar, unit: 'g', color: 'bg-pink-50 border-pink-200', icon: '🍬' },
+                                                    { l: 'โซเดียม', v: displayFood?.sodium, unit: 'mg', color: 'bg-purple-50 border-purple-200', icon: '🧂' }
+                                                ].map(x => (
+                                                    <div key={x.l} className={`${x.color} p-4 rounded-[2rem] border flex flex-col items-center text-center shadow-sm`}>
+                                                        <span className="text-2xl mb-2">{x.icon}</span>
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase mb-1">{x.l}</span>
+                                                        <p className="text-lg font-black text-slate-800">{x.v}{x.unit}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+                            {/* Dot Indicators */}
+                            <div className="flex justify-center gap-2 mt-4">
+                                <span className="w-2 h-2 rounded-full bg-orange-400"></span>
+                                <span className="w-2 h-2 rounded-full bg-slate-200"></span>
+                            </div>
+                            {/* Swipe Hint */}
+                            <p className="text-center text-[10px] text-slate-400 mt-2">← ปัดเพื่อดูข้อมูลเพิ่มเติม →</p>
                         </div>
-                        {/* Dot Indicators */}
-                        <div className="flex justify-center gap-2 mt-4">
-                            <span className="w-2 h-2 rounded-full bg-orange-400"></span>
-                            <span className="w-2 h-2 rounded-full bg-slate-200"></span>
+
+
+
+                        <div className="flex gap-3">
+                            <button onClick={() => setSelectedFood(null)} className="flex-1 py-5 rounded-[1.5rem] bg-slate-100 text-slate-500 font-black uppercase tracking-widest text-[11px] hover:bg-slate-200 transition-all">ยกเลิก</button>
+                            <button onClick={handleUpdatePortion} className="flex-[2] py-5 rounded-[1.5rem] bg-slate-800 text-white font-black uppercase tracking-widest text-[11px] shadow-xl active:scale-95 transition-all">
+                                {portion < 1 || Object.keys(manualOverride).length > 0 ? 'บันทึกการแก้ไข' : 'ปิดหน้าต่าง'}
+                            </button>
                         </div>
-                        {/* Swipe Hint */}
-                        <p className="text-center text-[10px] text-slate-400 mt-2">← ปัดเพื่อดูข้อมูลเพิ่มเติม →</p>
                     </div>
-
-
-
-                    <div className="flex gap-3">
-                        <button onClick={() => setSelectedFood(null)} className="flex-1 py-5 rounded-[1.5rem] bg-slate-100 text-slate-500 font-black uppercase tracking-widest text-[11px] hover:bg-slate-200 transition-all">ยกเลิก</button>
-                        <button onClick={handleUpdatePortion} className="flex-[2] py-5 rounded-[1.5rem] bg-slate-800 text-white font-black uppercase tracking-widest text-[11px] shadow-xl active:scale-95 transition-all">
-                            {portion < 1 || Object.keys(manualOverride).length > 0 ? 'บันทึกการแก้ไข' : 'ปิดหน้าต่าง'}
-                        </button>
-                    </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Add Modal */}
-            {showAddModal && (
-                <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#FAF8F6]/80 backdrop-blur-md p-4 animate-in fade-in duration-300 max-w-md mx-auto">
-                    <div className="bg-white w-full rounded-[3.5rem] p-10 space-y-8 shadow-[0_-20px_80px_rgba(0,0,0,0.05)] animate-in slide-in-from-bottom-12 duration-700 max-h-[92vh] overflow-y-auto">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-2xl font-black text-slate-800 tracking-tight">เพิ่มเมนูใหม่</h2>
-                            <button onClick={() => setShowAddModal(false)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400"><X className="w-5 h-5" /></button>
+            {
+                showAddModal && (
+                    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-[#FAF8F6]/80 backdrop-blur-md p-4 animate-in fade-in duration-300 max-w-md mx-auto">
+                        <div className="bg-white w-full rounded-[3.5rem] p-10 space-y-8 shadow-[0_-20px_80px_rgba(0,0,0,0.05)] animate-in slide-in-from-bottom-12 duration-700 max-h-[92vh] overflow-y-auto">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-2xl font-black text-slate-800 tracking-tight">เพิ่มเมนูใหม่</h2>
+                                <button onClick={() => setShowAddModal(false)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400"><X className="w-5 h-5" /></button>
+                            </div>
+                            {isScanning ? (
+                                <div className="py-20 flex flex-col items-center justify-center text-center space-y-7">
+                                    <div className="relative"><div className="w-20 h-20 border-[6px] border-orange-50 border-t-[#E88D67] rounded-full animate-spin" /><Activity className="absolute inset-0 m-auto w-6 h-6 text-[#E88D67] animate-pulse" /></div>
+                                    <p className="font-black text-slate-800 text-lg">AI กำลังวิเคราะห์ข้อมูล...</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-8 pb-10">
+                                    <label className="group relative block w-full bg-gradient-to-br from-[#E88D67] to-[#F3BD7E] p-8 rounded-[2.5rem] shadow-2xl shadow-orange-100 transition-all active:scale-95 cursor-pointer overflow-hidden">
+                                        <div className="relative flex flex-col items-center justify-center gap-3 text-center">
+                                            <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-[#E88D67] shadow-xl"><Camera className="w-8 h-8" /></div>
+                                            <span className="text-base font-black text-white block">วิเคราะห์ด้วย AI</span>
+                                        </div>
+                                        <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                                    </label>
+                                    <button
+                                        onClick={() => setShowManualForm(!showManualForm)}
+                                        className={`flex flex-col items-center justify-center gap-2 w-full p-8 border-2 text-slate-800 rounded-[2.5rem] font-black shadow-sm transition-all active:scale-95 ${showManualForm
+                                            ? 'bg-slate-100 border-slate-200'
+                                            : 'bg-white border-slate-100 hover:bg-slate-50'
+                                            }`}
+                                    >
+                                        <ImageIcon className="w-8 h-8 text-[#7DA6C9]" />
+                                        <span className="text-[11px] uppercase tracking-[0.15em] text-center">
+                                            {showManualForm ? 'ซ่อนฟอร์มกรอกข้อมูล' : 'เพิ่มรูปภาพและกรอกข้อมูลเอง'}
+                                        </span>
+                                    </button>
+
+                                    {/* [NEW] Favorite Menu Button */}
+                                    <button
+                                        onClick={() => setShowFavoriteModal(true)}
+                                        className="flex flex-col items-center justify-center gap-2 w-full p-8 bg-gradient-to-br from-pink-50 to-rose-50 border-2 border-pink-100 text-slate-800 rounded-[2.5rem] font-black shadow-sm hover:from-pink-100 hover:to-rose-100 transition-all active:scale-95"
+                                    >
+                                        <span className="text-3xl">❤️</span>
+                                        <span className="text-[11px] uppercase tracking-[0.15em] text-center text-pink-600">เพิ่มเมนูที่ถูกใจ</span>
+                                    </button>
+
+                                    {/* Manual Form - Only show when toggled */}
+                                    {showManualForm && (
+                                        <>
+                                            <div className="h-px bg-slate-50 w-full" />
+                                            <form ref={manualFormRef} className="space-y-6 pt-4" onSubmit={handleManualSubmit}>
+                                                {/* Image Upload Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => manualImageInputRef.current?.click()}
+                                                    className="w-full p-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:border-[#7DA6C9] hover:text-[#7DA6C9] transition-all"
+                                                >
+                                                    📷 กดเพื่อเลือกรูปภาพ
+                                                </button>
+                                                <input ref={manualImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleManualImageSelect} />
+
+                                                {previewImage && <div className="relative w-full h-40 rounded-2xl overflow-hidden mb-4 border border-slate-100"><img src={previewImage} className="w-full h-full object-cover" alt="Preview" /><button type="button" onClick={() => setPreviewImage(null)} className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-sm"><X className="w-4 h-4" /></button></div>}
+
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">ชื่อเมนู</label>
+                                                    <input name="name" required placeholder="เช่น ผัดไทยกุ้งสด" className="w-full px-6 py-4 bg-[#FAF8F6] rounded-[1.2rem] border border-transparent focus:bg-white focus:border-slate-200 outline-none text-xs font-bold shadow-inner transition-all" />
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">แคลอรี่ (kcal)</label>
+                                                    <input name="calories" type="number" required placeholder="0" className="w-full px-6 py-4 bg-[#FAF8F6] rounded-[1.2rem] border border-transparent focus:bg-white focus:border-slate-200 outline-none text-xs font-bold shadow-inner transition-all" />
+                                                </div>
+
+                                                <div className="grid grid-cols-3 gap-3 pt-2">
+                                                    <div className="space-y-2">
+                                                        <label className="text-[9px] font-black text-cyan-500 uppercase tracking-widest ml-1 text-center block">Protein (g)</label>
+                                                        <input name="protein" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-cyan-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest ml-1 text-center block">Carbs (g)</label>
+                                                        <input name="carbs" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-orange-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[9px] font-black text-lime-500 uppercase tracking-widest ml-1 text-center block">Fat (g)</label>
+                                                        <input name="fat" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-lime-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                                    </div>
+                                                </div>
+
+                                                {/* Row 2: Micro Nutrients */}
+                                                <div className="grid grid-cols-3 gap-3 pt-2">
+                                                    <div className="space-y-2">
+                                                        <label className="text-[9px] font-black text-yellow-500 uppercase tracking-widest ml-1 text-center block">Cholesterol (mg)</label>
+                                                        <input name="cholesterol" type="number" step="1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-yellow-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[9px] font-black text-pink-500 uppercase tracking-widest ml-1 text-center block">Sugar (g)</label>
+                                                        <input name="sugar" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-pink-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[9px] font-black text-purple-500 uppercase tracking-widest ml-1 text-center block">Sodium (mg)</label>
+                                                        <input name="sodium" type="number" step="1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-purple-100 outline-none text-[11px] font-black text-center shadow-inner" />
+                                                    </div>
+                                                </div>
+
+                                                <button type="submit" className="w-full py-5 mt-4 bg-gradient-to-r from-slate-800 to-black text-white rounded-[2rem] font-black shadow-2xl active:scale-95 transition-all uppercase tracking-[0.2em] text-[10px]">บันทึกข้อมูล</button>
+                                            </form>
+                                        </>
+                                    )}
+                                </div>
+                            )}
                         </div>
-                        {isScanning ? (
-                            <div className="py-20 flex flex-col items-center justify-center text-center space-y-7">
-                                <div className="relative"><div className="w-20 h-20 border-[6px] border-orange-50 border-t-[#E88D67] rounded-full animate-spin" /><Activity className="absolute inset-0 m-auto w-6 h-6 text-[#E88D67] animate-pulse" /></div>
-                                <p className="font-black text-slate-800 text-lg">AI กำลังวิเคราะห์ข้อมูล...</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-8 pb-10">
-                                <label className="group relative block w-full bg-gradient-to-br from-[#E88D67] to-[#F3BD7E] p-8 rounded-[2.5rem] shadow-2xl shadow-orange-100 transition-all active:scale-95 cursor-pointer overflow-hidden">
-                                    <div className="relative flex flex-col items-center justify-center gap-3 text-center">
-                                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-[#E88D67] shadow-xl"><Camera className="w-8 h-8" /></div>
-                                        <span className="text-base font-black text-white block">วิเคราะห์ด้วย AI</span>
-                                    </div>
-                                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                                </label>
-                                <button
-                                    onClick={() => setShowManualForm(!showManualForm)}
-                                    className={`flex flex-col items-center justify-center gap-2 w-full p-8 border-2 text-slate-800 rounded-[2.5rem] font-black shadow-sm transition-all active:scale-95 ${showManualForm
-                                        ? 'bg-slate-100 border-slate-200'
-                                        : 'bg-white border-slate-100 hover:bg-slate-50'
-                                        }`}
-                                >
-                                    <ImageIcon className="w-8 h-8 text-[#7DA6C9]" />
-                                    <span className="text-[11px] uppercase tracking-[0.15em] text-center">
-                                        {showManualForm ? 'ซ่อนฟอร์มกรอกข้อมูล' : 'เพิ่มรูปภาพและกรอกข้อมูลเอง'}
-                                    </span>
-                                </button>
-
-                                {/* [NEW] Favorite Menu Button */}
-                                <button
-                                    onClick={() => setShowFavoriteModal(true)}
-                                    className="flex flex-col items-center justify-center gap-2 w-full p-8 bg-gradient-to-br from-pink-50 to-rose-50 border-2 border-pink-100 text-slate-800 rounded-[2.5rem] font-black shadow-sm hover:from-pink-100 hover:to-rose-100 transition-all active:scale-95"
-                                >
-                                    <span className="text-3xl">❤️</span>
-                                    <span className="text-[11px] uppercase tracking-[0.15em] text-center text-pink-600">เพิ่มเมนูที่ถูกใจ</span>
-                                </button>
-
-                                {/* Manual Form - Only show when toggled */}
-                                {showManualForm && (
-                                    <>
-                                        <div className="h-px bg-slate-50 w-full" />
-                                        <form ref={manualFormRef} className="space-y-6 pt-4" onSubmit={handleManualSubmit}>
-                                            {/* Image Upload Button */}
-                                            <button
-                                                type="button"
-                                                onClick={() => manualImageInputRef.current?.click()}
-                                                className="w-full p-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 hover:border-[#7DA6C9] hover:text-[#7DA6C9] transition-all"
-                                            >
-                                                📷 กดเพื่อเลือกรูปภาพ
-                                            </button>
-                                            <input ref={manualImageInputRef} type="file" accept="image/*" className="hidden" onChange={handleManualImageSelect} />
-
-                                            {previewImage && <div className="relative w-full h-40 rounded-2xl overflow-hidden mb-4 border border-slate-100"><img src={previewImage} className="w-full h-full object-cover" alt="Preview" /><button type="button" onClick={() => setPreviewImage(null)} className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-sm"><X className="w-4 h-4" /></button></div>}
-
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">ชื่อเมนู</label>
-                                                <input name="name" required placeholder="เช่น ผัดไทยกุ้งสด" className="w-full px-6 py-4 bg-[#FAF8F6] rounded-[1.2rem] border border-transparent focus:bg-white focus:border-slate-200 outline-none text-xs font-bold shadow-inner transition-all" />
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">แคลอรี่ (kcal)</label>
-                                                <input name="calories" type="number" required placeholder="0" className="w-full px-6 py-4 bg-[#FAF8F6] rounded-[1.2rem] border border-transparent focus:bg-white focus:border-slate-200 outline-none text-xs font-bold shadow-inner transition-all" />
-                                            </div>
-
-                                            <div className="grid grid-cols-3 gap-3 pt-2">
-                                                <div className="space-y-2">
-                                                    <label className="text-[9px] font-black text-cyan-500 uppercase tracking-widest ml-1 text-center block">Protein (g)</label>
-                                                    <input name="protein" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-cyan-100 outline-none text-[11px] font-black text-center shadow-inner" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest ml-1 text-center block">Carbs (g)</label>
-                                                    <input name="carbs" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-orange-100 outline-none text-[11px] font-black text-center shadow-inner" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[9px] font-black text-lime-500 uppercase tracking-widest ml-1 text-center block">Fat (g)</label>
-                                                    <input name="fat" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-lime-100 outline-none text-[11px] font-black text-center shadow-inner" />
-                                                </div>
-                                            </div>
-
-                                            {/* Row 2: Micro Nutrients */}
-                                            <div className="grid grid-cols-3 gap-3 pt-2">
-                                                <div className="space-y-2">
-                                                    <label className="text-[9px] font-black text-yellow-500 uppercase tracking-widest ml-1 text-center block">Cholesterol (mg)</label>
-                                                    <input name="cholesterol" type="number" step="1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-yellow-100 outline-none text-[11px] font-black text-center shadow-inner" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[9px] font-black text-pink-500 uppercase tracking-widest ml-1 text-center block">Sugar (g)</label>
-                                                    <input name="sugar" type="number" step="0.1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-pink-100 outline-none text-[11px] font-black text-center shadow-inner" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[9px] font-black text-purple-500 uppercase tracking-widest ml-1 text-center block">Sodium (mg)</label>
-                                                    <input name="sodium" type="number" step="1" placeholder="0" className="w-full px-4 py-3 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-purple-100 outline-none text-[11px] font-black text-center shadow-inner" />
-                                                </div>
-                                            </div>
-
-                                            <button type="submit" className="w-full py-5 mt-4 bg-gradient-to-r from-slate-800 to-black text-white rounded-[2rem] font-black shadow-2xl active:scale-95 transition-all uppercase tracking-[0.2em] text-[10px]">บันทึกข้อมูล</button>
-                                        </form>
-                                    </>
-                                )}
-                            </div>
-                        )}
                     </div>
-                </div>
-            )
+                )
             }
 
             {/* Weight Update Modal */}
@@ -1579,62 +1562,64 @@ const Dashboard: React.FC = () => {
             }
 
             {/* [NEW] Month Picker Modal */}
-            {showMonthPicker && (
-                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-[2rem] p-6 shadow-2xl w-full max-w-sm animate-in zoom-in-95 duration-200">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-black text-slate-800">เลือกเดือน</h2>
-                            <button onClick={() => setShowMonthPicker(false)} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100">
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
+            {
+                showMonthPicker && (
+                    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                        <div className="bg-white rounded-[2rem] p-6 shadow-2xl w-full max-w-sm animate-in zoom-in-95 duration-200">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-black text-slate-800">เลือกเดือน</h2>
+                                <button onClick={() => setShowMonthPicker(false)} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
 
-                        {/* Year Selector */}
-                        <div className="flex items-center justify-center gap-6 mb-6">
-                            <button onClick={() => setPickerYear(prev => prev - 1)} className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center hover:bg-orange-100 transition-colors">
-                                <ChevronLeft className="w-6 h-6" />
-                            </button>
-                            <span className="text-2xl font-black text-slate-700">{pickerYear + 543}</span>
-                            <button onClick={() => setPickerYear(prev => prev + 1)} className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center hover:bg-orange-100 transition-colors">
-                                <ChevronRight className="w-6 h-6" />
-                            </button>
-                        </div>
+                            {/* Year Selector */}
+                            <div className="flex items-center justify-center gap-6 mb-6">
+                                <button onClick={() => setPickerYear(prev => prev - 1)} className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center hover:bg-orange-100 transition-colors">
+                                    <ChevronLeft className="w-6 h-6" />
+                                </button>
+                                <span className="text-2xl font-black text-slate-700">{pickerYear + 543}</span>
+                                <button onClick={() => setPickerYear(prev => prev + 1)} className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center hover:bg-orange-100 transition-colors">
+                                    <ChevronRight className="w-6 h-6" />
+                                </button>
+                            </div>
 
-                        {/* Month Grid */}
-                        <div className="grid grid-cols-4 gap-3">
-                            {['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'].map((m, idx) => {
-                                const currentMonth = new Date().getMonth();
-                                const currentYear = new Date().getFullYear();
-                                const isCurrent = pickerYear === currentYear && idx === currentMonth;
-                                const isSelected = new Date(selectedDate).getMonth() === idx && new Date(selectedDate).getFullYear() === pickerYear;
+                            {/* Month Grid */}
+                            <div className="grid grid-cols-4 gap-3">
+                                {['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'].map((m, idx) => {
+                                    const currentMonth = new Date().getMonth();
+                                    const currentYear = new Date().getFullYear();
+                                    const isCurrent = pickerYear === currentYear && idx === currentMonth;
+                                    const isSelected = new Date(selectedDate).getMonth() === idx && new Date(selectedDate).getFullYear() === pickerYear;
 
-                                return (
-                                    <button
-                                        key={m}
-                                        onClick={() => {
-                                            const newDate = new Date(pickerYear, idx, 1);
-                                            // Format as YYYY-MM-DD in local time
-                                            const yyyy = newDate.getFullYear();
-                                            const mm = String(newDate.getMonth() + 1).padStart(2, '0');
-                                            const dd = '01';
-                                            setSelectedDate(`${yyyy}-${mm}-${dd}`);
-                                            setShowMonthPicker(false);
-                                        }}
-                                        className={`py-3 rounded-2xl text-sm font-bold transition-all ${isSelected
-                                            ? 'bg-gradient-to-br from-orange-400 to-rose-400 text-white shadow-lg scale-105'
-                                            : isCurrent
-                                                ? 'bg-orange-50 text-orange-500 border border-orange-100'
-                                                : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
-                                            }`}
-                                    >
-                                        {m}
-                                    </button>
-                                );
-                            })}
+                                    return (
+                                        <button
+                                            key={m}
+                                            onClick={() => {
+                                                const newDate = new Date(pickerYear, idx, 1);
+                                                // Format as YYYY-MM-DD in local time
+                                                const yyyy = newDate.getFullYear();
+                                                const mm = String(newDate.getMonth() + 1).padStart(2, '0');
+                                                const dd = '01';
+                                                setSelectedDate(`${yyyy}-${mm}-${dd}`);
+                                                setShowMonthPicker(false);
+                                            }}
+                                            className={`py-3 rounded-2xl text-sm font-bold transition-all ${isSelected
+                                                ? 'bg-gradient-to-br from-orange-400 to-rose-400 text-white shadow-lg scale-105'
+                                                : isCurrent
+                                                    ? 'bg-orange-50 text-orange-500 border border-orange-100'
+                                                    : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                                                }`}
+                                        >
+                                            {m}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Favorite Menu Modal */}
             <FavoriteMenuModal
@@ -1644,43 +1629,45 @@ const Dashboard: React.FC = () => {
                 userId={user?.id || ''}
             />
             {/* [NEW] Custom Portion Input Modal */}
-            {showPortionInput && (
-                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6 animate-in fade-in duration-300">
-                    <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
-                        <div className="flex justify-between items-center mb-6">
-                            <div>
-                                <h2 className="text-xl font-black text-slate-800">ระบุปริมาณเอง</h2>
-                                <p className="text-[10px] text-slate-400 font-medium">ใส่จำนวนที่ต้องการ (เช่น 1, 1.5, 3)</p>
+            {
+                showPortionInput && (
+                    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6 animate-in fade-in duration-300">
+                        <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in-95 duration-300">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 className="text-xl font-black text-slate-800">ระบุปริมาณเอง</h2>
+                                    <p className="text-[10px] text-slate-400 font-medium">ใส่จำนวนที่ต้องการ (เช่น 1, 1.5, 3)</p>
+                                </div>
+                                <button onClick={() => setShowPortionInput(false)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100"><X className="w-5 h-5" /></button>
                             </div>
-                            <button onClick={() => setShowPortionInput(false)} className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100"><X className="w-5 h-5" /></button>
+                            <form onSubmit={(e) => {
+                                e.preventDefault();
+                                const formData = new FormData(e.target as HTMLFormElement);
+                                const val = parseFloat(formData.get('customPortion') as string);
+                                if (!isNaN(val) && val > 0) {
+                                    setPortion(val);
+                                    setShowPortionInput(false);
+                                }
+                            }}>
+                                <div className="space-y-4">
+                                    <input
+                                        name="customPortion"
+                                        type="number"
+                                        step="0.1"
+                                        autoFocus
+                                        placeholder="1.0"
+                                        defaultValue={portion}
+                                        className="w-full px-6 py-4 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-orange-200 outline-none text-3xl font-black text-center text-slate-800 shadow-inner"
+                                    />
+                                    <button type="submit" className="w-full py-4 bg-gradient-to-r from-orange-400 to-rose-400 text-white rounded-2xl font-black text-sm shadow-lg shadow-orange-200/50 active:scale-95 transition-all uppercase tracking-widest">
+                                        ตกลง
+                                    </button>
+                                </div>
+                            </form>
                         </div>
-                        <form onSubmit={(e) => {
-                            e.preventDefault();
-                            const formData = new FormData(e.target as HTMLFormElement);
-                            const val = parseFloat(formData.get('customPortion') as string);
-                            if (!isNaN(val) && val > 0) {
-                                setPortion(val);
-                                setShowPortionInput(false);
-                            }
-                        }}>
-                            <div className="space-y-4">
-                                <input
-                                    name="customPortion"
-                                    type="number"
-                                    step="0.1"
-                                    autoFocus
-                                    placeholder="1.0"
-                                    defaultValue={portion}
-                                    className="w-full px-6 py-4 bg-[#FAF8F6] rounded-2xl border border-transparent focus:bg-white focus:border-orange-200 outline-none text-3xl font-black text-center text-slate-800 shadow-inner"
-                                />
-                                <button type="submit" className="w-full py-4 bg-gradient-to-r from-orange-400 to-rose-400 text-white rounded-2xl font-black text-sm shadow-lg shadow-orange-200/50 active:scale-95 transition-all uppercase tracking-widest">
-                                    ตกลง
-                                </button>
-                            </div>
-                        </form>
                     </div>
-                </div>
-            )}
+                )
+            }
         </div >
     );
 };
