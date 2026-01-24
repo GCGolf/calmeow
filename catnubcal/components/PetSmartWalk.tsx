@@ -5,6 +5,8 @@ interface PetSmartWalkProps {
     onReset?: () => void;
     currentCalories: number;
     goalCalories: number;
+    streak?: number; // [NEW] Streak count for rewards
+    feedTrigger?: number; // [NEW] Increment to trigger feeding animation
 }
 
 const CAT_MESSAGES = [
@@ -23,7 +25,7 @@ const CAT_MESSAGES = [
     "ถ้าเหนื่อยก็พัก..มาเล่นกันเมี๊ยว 😺"
 ];
 
-const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, goalCalories }) => {
+const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, goalCalories, streak = 0, feedTrigger = 0 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const directionWrapperRef = useRef<HTMLDivElement>(null);
     const animTargetRef = useRef<HTMLDivElement>(null);
@@ -36,8 +38,26 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
     const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
     const resetTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+    const [isFeeding, setIsFeeding] = useState(false); // [NEW] Feeding state
+
     // Check if goal is reached (and goal is valid > 0)
     const isGoalReached = goalCalories > 0 && currentCalories >= goalCalories;
+
+    // [NEW] Handle Feeding Trigger
+    useEffect(() => {
+        if (feedTrigger > 0) {
+            setIsFeeding(true);
+            // Trigger happy cat reaction after food arrives
+            setTimeout(() => {
+                setIsFeeding(false);
+                if (animTargetRef.current) {
+                    animTargetRef.current.classList.add('eating-anim');
+                    setTimeout(() => animTargetRef.current?.classList.remove('eating-anim'), 1000);
+                }
+                sit("ง่ำๆ อร่อยจัง! 😋", 2);
+            }, 800);
+        }
+    }, [feedTrigger]);
 
     // Load saved image on mount
     useEffect(() => {
@@ -303,6 +323,25 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
                 </div>
             </div>
 
+            {/* [NEW] Feeding Animation - Flying Food */}
+            {isFeeding && (
+                <div className="absolute -top-10 left-1/2 -translate-x-1/2 text-2xl animate-feed z-[60] pointer-events-none">
+                    🐟
+                </div>
+            )}
+
+            {/* [NEW] Streak Rewards - Conditional Rendering */}
+            {streak >= 7 && (
+                <div className="absolute bottom-0 left-[2%] w-10 h-10 opacity-90 drop-shadow-sm select-none pointer-events-none z-10" title="Streak 7+ Days Reward">
+                    <span className="text-3xl filter brightness-110">🧶</span>
+                </div>
+            )}
+            {streak >= 30 && (
+                <div className="absolute bottom-0 right-[2%] w-12 h-12 opacity-90 drop-shadow-sm select-none pointer-events-none z-10" title="Streak 30+ Days Reward">
+                    <span className="text-4xl filter brightness-110">📦</span>
+                </div>
+            )}
+
             {/* Global Styles - Optimized for Mobile */}
             <style>{`
                 /* Respect user preference for reduced motion */
@@ -357,6 +396,19 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
                     25% { transform: translateX(-1px) rotate(-3deg); } /* Reduced intensity */
                     75% { transform: translateX(1px) rotate(3deg); }
                     100% { transform: translateX(0) rotate(0deg); }
+                }
+
+                /* [NEW] Feeding Animations */
+                @keyframes feedFly {
+                    0% { transform: translate(-50%, -100px) scale(0.5); opacity: 0; }
+                    50% { opacity: 1; }
+                    100% { transform: translate(-50%, 40px) scale(1); opacity: 0; }
+                }
+                .animate-feed {
+                    animation: feedFly 0.8s ease-in forwards;
+                }
+                .eating-anim img {
+                    animation: angryShake 0.3s infinite ease-in-out; /* Reuse shake for chewing */
                 }
             `}</style>
         </div>

@@ -62,6 +62,7 @@ const Dashboard: React.FC = () => {
     const [showManualForm, setShowManualForm] = useState(false); // Toggle manual entry form
     const [showPortionInput, setShowPortionInput] = useState(false); // [NEW] Custom portion input state
     const [isEditingMacros, setIsEditingMacros] = useState(false); // [NEW] Toggle Edit Mode
+    const [feedTrigger, setFeedTrigger] = useState(0); // [NEW] Trigger for Pet Feeding Animation
 
     // Check if current food is favorited when selectedFood changes
     useEffect(() => {
@@ -102,7 +103,10 @@ const Dashboard: React.FC = () => {
                     .eq('name', selectedFood.name);
 
                 if (error) throw error;
-                setIsFavorite(false);
+                setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
+                setSelectedFood(null); // Close modal
+                setIsFavorite(false); // Reset favorite state logic if needed
+                alert('บันทึกสำเร็จ!');
             } else {
                 // Add to favorites
                 const { data, error } = await supabase
@@ -184,6 +188,9 @@ const Dashboard: React.FC = () => {
                     servingSize: { unit: 'serving', quantity: 1 }
                 };
                 setFoodLog(prev => [...prev, newFood]);
+                setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
+                setShowFavoriteModal(false);
+                setShowAddModal(false);
             }
         } catch (err) {
             console.error("Error:", err);
@@ -570,6 +577,7 @@ const Dashboard: React.FC = () => {
                     };
                     setFoodLog(prev => [...prev, newFood]);
                     setSelectedFood(newFood);
+                    setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
                 }
             }
             setShowAddModal(false);
@@ -617,6 +625,7 @@ const Dashboard: React.FC = () => {
                 servingSize: { unit: 'portion', quantity: 1 },
             };
             setFoodLog(prev => [...prev, newFood]);
+            setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
         } finally {
             setIsScanning(false);
         }
@@ -689,9 +698,11 @@ const Dashboard: React.FC = () => {
                 imageUrl: offlineEntry.image_url,
             };
             setFoodLog(prev => [...prev, newFood]);
+            setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
             setShowAddModal(false);
             manualFormRef.current?.reset();
             setPreviewImage(null);
+            setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
             return;
         }
 
@@ -713,6 +724,7 @@ const Dashboard: React.FC = () => {
                 servingSize: { unit: 'serving', quantity: 1 }
             };
             setFoodLog(prev => [...prev, newFood]);
+            setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
         }
 
         setShowAddModal(false);
@@ -799,6 +811,7 @@ const Dashboard: React.FC = () => {
         };
 
         setFoodLog(prev => prev.map(f => f.id === selectedFood.id ? updatedFood : f));
+        setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
         setSelectedFood(null); // Close modal
     };
 
@@ -1005,6 +1018,8 @@ const Dashboard: React.FC = () => {
                         <PetSmartWalk
                             currentCalories={currentDayStats.calories}
                             goalCalories={userStats.tdee}
+                            streak={streak}
+                            feedTrigger={feedTrigger}
                         />
 
                         {/* Nutrition Stats - Glass Design */}
