@@ -1,6 +1,30 @@
 # Developer Log - NekoFit Project
-**Last Updated:** 2026-01-21 20:05
-**Status:** Health Grade Calendar Integrated, UI Polish
+**Last Updated:** 2026-01-22 22:30
+**Status:** Editable Macros, Custom Loader, Polish
+
+---
+
+## ✅ Completed Today (Session 8 - Jan 22)
+
+### 1. Editable Macros on Food Preview (Custom Nutrition)
+- **Feature**: Users can now manually edit Protein, Carbs, and Fat values in the Food Detail modal.
+- **Logic**:
+    - **Toggle System**: Added an "Edit" (pencil) button to unlock the input fields.
+    - **Auto-Calculation**: Editing any macro automatically recalculates total Calories (P*4 + C*4 + F*9).
+    - **Smart Saving**: Fixed save logic to respect manual overrides even if the portion multiplier (1.0) didn't change.
+- **UI**:
+    - **Clean Inputs**: Removed browser-default number spinners.
+    - **Inline Units**: "g" unit displayed inline with the number for a cohesive look.
+    - **Typography**: Maintained large, readable fonts.
+
+### 2. Branding & Polish
+- **Loading Screen**: Replaced generic emoji with custom `@headcat.png` animation (Bouncing Cat).
+- **Logos**: Updated app icons (`logo192.png`, `logo512.png`).
+- **Refinement**: General cleanup of input states and button transitions.
+
+### 3. Deployment
+- **Status**: All changes pushed to `main`.
+- **Docs**: Updated `task.md` and `walkthrough.md`.
 
 ---
 

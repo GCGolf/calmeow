@@ -132,6 +132,8 @@ const Dashboard: React.FC = () => {
 
     // Date Selection State - MOVED UP to fix ReferenceError
     const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
+    const [showMonthPicker, setShowMonthPicker] = useState(false); // [NEW] Month Picker Modal Toggle
+    const [pickerYear, setPickerYear] = useState(new Date().getFullYear()); // [NEW] Picker Year State
 
     // Handle Selecting from Favorite Menu
     const handleSelectFavorite = async (favFood: FoodItem) => {
@@ -960,9 +962,15 @@ const Dashboard: React.FC = () => {
                     <div className="flex items-center justify-between mb-4 px-2">
                         <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-rose-400" />
-                            <span className="font-header text-sm font-medium text-slate-600">
+                            <button
+                                onClick={() => {
+                                    setPickerYear(new Date(selectedDate).getFullYear());
+                                    setShowMonthPicker(true);
+                                }}
+                                className="font-header text-sm font-medium text-slate-600 hover:text-rose-500 transition-colors"
+                            >
                                 {new Date(selectedDate).toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })}
-                            </span>
+                            </button>
                         </div>
                         <span className="text-xs font-semibold text-rose-500 bg-rose-50/50 px-3 py-1.5 rounded-full border border-rose-100/50">
                             {selectedDate === new Date().toLocaleDateString('en-CA') ? '📍 วันนี้' : new Date(selectedDate).toLocaleDateString('th-TH', { weekday: 'long' })}
@@ -1136,21 +1144,42 @@ const Dashboard: React.FC = () => {
                 )}
 
                 {activeTab === 'diary' && (
-                    <div className="space-y-8 pb-20">
-
-                        <div className="bg-white p-8 rounded-[3rem] border border-[#F1EFE9] shadow-[0_20px_40px_rgba(0,0,0,0.02)] flex justify-between items-center">
-                            <div className="space-y-1">
-                                <h3 className="text-xl font-black text-slate-800">บันทึกอาหาร</h3>
-                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Food Log Progress</p>
+                    <>
+                        <div className="bg-white/80 p-3 rounded-[2rem] border border-white/60 shadow-[0_10px_40px_-5px_rgba(0,0,0,0.03)] mb-6">
+                            <div className="flex items-center justify-between mb-4 px-2">
+                                <button
+                                    onClick={() => {
+                                        setPickerYear(new Date(selectedDate).getFullYear());
+                                        setShowMonthPicker(true);
+                                    }}
+                                    className="flex items-center gap-2 group cursor-pointer"
+                                >
+                                    <Calendar className="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
+                                    <span className="font-header text-sm font-medium text-slate-600 group-hover:text-rose-500 transition-colors">
+                                        {new Date(selectedDate).toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })}
+                                    </span>
+                                </button>
+                                <span className="text-xs font-semibold text-rose-500 bg-rose-50/50 px-3 py-1.5 rounded-full border border-rose-100/50">
+                                    {selectedDate === new Date().toLocaleDateString('en-CA') ? '📍 วันนี้' : new Date(selectedDate).toLocaleDateString('th-TH', { weekday: 'long' })}
+                                </span>
                             </div>
-                            <button onClick={openAddModal} className="bg-[#1A1C1E] text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl active:scale-90 transition-all">
-                                <Plus className="w-7 h-7" />
-                            </button>
-                        </div>
+                            <div className="space-y-8 pb-20">
 
-                        {/* [MODIFIED] Use Extracted FoodList Component */}
-                        <FoodList foodLog={foodLog} onSelect={setSelectedFood} />
-                    </div>
+                                <div className="bg-white p-8 rounded-[3rem] border border-[#F1EFE9] shadow-[0_20px_40px_rgba(0,0,0,0.02)] flex justify-between items-center">
+                                    <div className="space-y-1">
+                                        <h3 className="text-xl font-black text-slate-800">บันทึกอาหาร</h3>
+                                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Food Log Progress</p>
+                                    </div>
+                                    <button onClick={openAddModal} className="bg-[#1A1C1E] text-white w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl active:scale-90 transition-all">
+                                        <Plus className="w-7 h-7" />
+                                    </button>
+                                </div>
+
+                                {/* [MODIFIED] Use Extracted FoodList Component */}
+                                <FoodList foodLog={foodLog} onSelect={setSelectedFood} />
+                            </div>
+                        </div>
+                    </>
                 )}
 
                 {activeTab === 'analytics' && <Analytics />}
@@ -1533,6 +1562,65 @@ const Dashboard: React.FC = () => {
                     </div>
                 )
             }
+
+            {/* [NEW] Month Picker Modal */}
+            {showMonthPicker && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[2rem] p-6 shadow-2xl w-full max-w-sm animate-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-xl font-black text-slate-800">เลือกเดือน</h2>
+                            <button onClick={() => setShowMonthPicker(false)} className="w-8 h-8 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Year Selector */}
+                        <div className="flex items-center justify-center gap-6 mb-6">
+                            <button onClick={() => setPickerYear(prev => prev - 1)} className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center hover:bg-orange-100 transition-colors">
+                                <ChevronLeft className="w-6 h-6" />
+                            </button>
+                            <span className="text-2xl font-black text-slate-700">{pickerYear + 543}</span>
+                            <button onClick={() => setPickerYear(prev => prev + 1)} className="w-10 h-10 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center hover:bg-orange-100 transition-colors">
+                                <ChevronRight className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        {/* Month Grid */}
+                        <div className="grid grid-cols-4 gap-3">
+                            {['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'].map((m, idx) => {
+                                const currentMonth = new Date().getMonth();
+                                const currentYear = new Date().getFullYear();
+                                const isCurrent = pickerYear === currentYear && idx === currentMonth;
+                                const isSelected = new Date(selectedDate).getMonth() === idx && new Date(selectedDate).getFullYear() === pickerYear;
+
+                                return (
+                                    <button
+                                        key={m}
+                                        onClick={() => {
+                                            const newDate = new Date(pickerYear, idx, 1);
+                                            // Format as YYYY-MM-DD in local time
+                                            const yyyy = newDate.getFullYear();
+                                            const mm = String(newDate.getMonth() + 1).padStart(2, '0');
+                                            const dd = '01';
+                                            setSelectedDate(`${yyyy}-${mm}-${dd}`);
+                                            setShowMonthPicker(false);
+                                        }}
+                                        className={`py-3 rounded-2xl text-sm font-bold transition-all ${isSelected
+                                            ? 'bg-gradient-to-br from-orange-400 to-rose-400 text-white shadow-lg scale-105'
+                                            : isCurrent
+                                                ? 'bg-orange-50 text-orange-500 border border-orange-100'
+                                                : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                                            }`}
+                                    >
+                                        {m}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Favorite Menu Modal */}
             <FavoriteMenuModal
                 isOpen={showFavoriteModal}
