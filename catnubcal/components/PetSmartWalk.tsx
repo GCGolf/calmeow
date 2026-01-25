@@ -39,6 +39,7 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
     const resetTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     const [isFeeding, setIsFeeding] = useState(false); // [NEW] Feeding state
+    const [yarnClickCount, setYarnClickCount] = useState(0); // [NEW] Yarn interaction count
 
     // Check if goal is reached (and goal is valid > 0)
     const isGoalReached = goalCalories > 0 && currentCalories >= goalCalories;
@@ -75,15 +76,27 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
     const walkTo = async (leftPosition: string, durationSec: number) => {
         if (!containerRef.current || !animTargetRef.current) return;
 
+        const parent = containerRef.current.parentElement;
+        if (!parent) return;
+
+        const parentWidth = parent.clientWidth;
+        const elementWidth = containerRef.current.clientWidth;
+
+        // Parse percentage (e.g., '80%')
+        const percentage = parseFloat(leftPosition) / 100;
+        const targetPixel = (parentWidth * percentage) - (elementWidth / 2);
+
         animTargetRef.current.classList.remove('sitting-pose');
         animTargetRef.current.classList.add('walking-anim');
 
-        containerRef.current.style.transition = `left ${durationSec}s linear`;
+        // Use Transform instead of Left for GPU acceleration
+        containerRef.current.style.transition = `transform ${durationSec}s linear`;
+        containerRef.current.style.left = '0px'; // Ensure we are in absolute coordinate mode
 
         await new Promise<void>(resolve => {
             requestAnimationFrame(() => {
                 if (containerRef.current) {
-                    containerRef.current.style.left = leftPosition;
+                    containerRef.current.style.transform = `translateX(${targetPixel}px)`;
                 }
                 resolve();
             });
@@ -163,20 +176,24 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
 
             if (containerRef.current) {
                 containerRef.current.style.transition = 'none';
+                containerRef.current.style.left = '0px'; // Switch to absolute pixel mode
+                // Reset to Center
+                const parent = containerRef.current.parentElement;
+                if (parent) {
+                    const centerPixel = (parent.clientWidth * 0.5) - (containerRef.current.clientWidth / 2);
+                    containerRef.current.style.transform = `translateX(${centerPixel}px)`;
+                }
             }
             if (directionWrapperRef.current) directionWrapperRef.current.style.transform = 'scaleX(1)';
 
             if (isGoalReached) {
-                if (containerRef.current) containerRef.current.style.left = '50%';
-                // Use goal-pose instead of sitting-pose to avoid conflict and ensure proper scaling
+                // Goal reached logic handles position via CSS/State mainly, but ensure centered
                 if (animTargetRef.current) animTargetRef.current.classList.add('goal-pose');
                 if (bubbleRef.current) {
                     bubbleRef.current.innerText = "วันนี้อิ่มแล้วเหมียว ❤️";
                     bubbleRef.current.classList.add('show-bubble');
                 }
             } else {
-                if (containerRef.current) containerRef.current.style.left = '50%';
-
                 requestAnimationFrame(() => {
                     setTimeout(() => {
                         runSequence();
@@ -186,6 +203,41 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
         }, 100);
 
         if (onReset) onReset();
+    };
+
+    const handleYarnClick = async (e: React.MouseEvent) => {
+        // Bounce Animation
+        const target = e.currentTarget as HTMLDivElement;
+        target.classList.add('animate-jump');
+        setTimeout(() => target.classList.remove('animate-jump'), 400);
+
+        e.stopPropagation();
+        isAnimating.current = false; // Stop background loop
+
+        setYarnClickCount(prev => prev + 1);
+        const newCount = yarnClickCount + 1;
+        const isAngry = newCount >= 5;
+
+        // Reset Timer
+        if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+        resetTimerRef.current = setTimeout(() => {
+            setYarnClickCount(0);
+            if (animTargetRef.current) animTargetRef.current.classList.remove('angry-anim');
+            resetAndStart();
+        }, 4000);
+
+        // Face Left & Walk to Yarn
+        if (directionWrapperRef.current) directionWrapperRef.current.style.transform = 'scaleX(-1)';
+
+        // Walk to Yarn (Left side)
+        await walkTo('15%', 0.8);
+
+        // React
+        const msg = isAngry ? "แง๊งงง! 💢" : "เมี๊ยววว 🧶";
+        if (isAngry && animTargetRef.current) {
+            animTargetRef.current.classList.add('angry-anim');
+        }
+        await sit(msg, 2);
     };
 
     const handleCatClick = () => {
@@ -238,26 +290,32 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
     return (
         <div className="relative w-full h-48 mt-10 mb-6 group select-none">
             {/* Background Pattern */}
-            <div className="absolute inset-0 opacity-20 pointer-events-none"
+            {/* Background Pattern or Cafe BG */}
+            <div className={`absolute inset-0 pointer-events-none transition-all duration-500 ${streak >= 45 ? 'opacity-100' : 'opacity-20'}`}
                 style={{
-                    backgroundImage: 'linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px)',
-                    backgroundSize: '40px 40px'
+                    backgroundImage: streak >= 45
+                        ? `url('/cat_cafe_bg.png')`
+                        : 'linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px)',
+                    backgroundSize: streak >= 45 ? 'cover' : '40px 40px',
+                    backgroundPosition: 'center bottom'
                 }}
             />
 
-            {/* The Rug - Reduced Opacity to /40 */}
-            <div className="absolute bottom-0 w-full h-1/4 bg-[#D2B48C]/40 rounded-t-[2rem] shadow-sm transform translate-y-2 pointer-events-none"
-                style={{
-                    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 20px)'
-                }}>
-                {/* Soft Fringe */}
-                <div className="absolute -top-1 left-0 w-full h-2 opacity-20"
+            {/* The Rug - Reduced Opacity to /40 (Hide if Cafe BG active) */}
+            {streak < 45 && (
+                <div className="absolute bottom-0 w-full h-1/4 bg-[#D2B48C]/40 rounded-t-[2rem] shadow-sm transform translate-y-2 pointer-events-none"
                     style={{
-                        background: 'linear-gradient(90deg, transparent 5px, rgba(0,0,0,0.1) 5px) repeat-x',
-                        backgroundSize: '10px 100%'
-                    }}
-                />
-            </div>
+                        backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 20px)'
+                    }}>
+                    {/* Soft Fringe */}
+                    <div className="absolute -top-1 left-0 w-full h-2 opacity-20"
+                        style={{
+                            background: 'linear-gradient(90deg, transparent 5px, rgba(0,0,0,0.1) 5px) repeat-x',
+                            backgroundSize: '10px 100%'
+                        }}
+                    />
+                </div>
+            )}
 
             {/* Controls */}
             <div className="absolute top-0 right-0 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -278,9 +336,9 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
                 id="cat-container"
                 className="absolute bottom-2 w-32 md:w-36 z-50 flex justify-center items-end cursor-pointer"
                 style={{
-                    willChange: 'left',
-                    left: '50%',
-                    transform: 'translateX(-50%)'
+                    willChange: 'transform',
+                    left: '50%', // Initial center
+                    transform: 'translateX(-50%)' // Initial center
                 }}
                 onClick={handleCatClick}
             >
@@ -319,6 +377,16 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
                             decoding="async"
                             className="w-full h-auto relative z-10 origin-bottom transition-transform duration-300 drop-shadow-sm select-none"
                         />
+
+                        {/* [NEW] Second Cat (Streak 30+) - Follower */}
+                        {streak >= 30 && (
+                            <img
+                                src="/cat2.png"
+                                alt="Friend Cat"
+                                loading="lazy"
+                                className="absolute -left-8 bottom-0 w-full h-auto z-0 origin-bottom transition-transform duration-300 drop-shadow-sm select-none filter brightness-95"
+                            />
+                        )}
                     </div>
                 </div>
             </div>
@@ -330,14 +398,17 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
                 </div>
             )}
 
-            {/* [NEW] Streak Rewards - Conditional Rendering */}
             {streak >= 7 && (
-                <div className="absolute bottom-0 left-[2%] w-10 h-10 opacity-90 drop-shadow-sm select-none pointer-events-none z-10" title="Streak 7+ Days Reward">
+                <div
+                    onClick={handleYarnClick}
+                    className="absolute bottom-0 left-[2%] w-10 h-10 opacity-90 drop-shadow-sm select-none pointer-events-auto cursor-pointer z-[70] hover:scale-110 transition-transform active:scale-95"
+                    title="รางวัลต่อเนื่อง 7 วัน (จิ้มเล่นได้เลย!)"
+                >
                     <span className="text-3xl filter brightness-110">🧶</span>
                 </div>
             )}
-            {streak >= 30 && (
-                <div className="absolute bottom-0 right-[2%] w-12 h-12 opacity-90 drop-shadow-sm select-none pointer-events-none z-10" title="Streak 30+ Days Reward">
+            {streak >= 14 && (
+                <div className="absolute bottom-0 right-[2%] w-12 h-12 opacity-90 drop-shadow-sm select-none pointer-events-none z-10" title="Streak 14+ Days Reward">
                     <span className="text-4xl filter brightness-110">📦</span>
                 </div>
             )}
@@ -409,6 +480,16 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
                 }
                 .eating-anim img {
                     animation: angryShake 0.3s infinite ease-in-out; /* Reuse shake for chewing */
+                }
+
+                /* Click Feedback Animation */
+                @keyframes jumpBounce {
+                    0% { transform: translateY(0) scale(1); }
+                    40% { transform: translateY(-10px) scale(1.1); } /* Jump Up */
+                    100% { transform: translateY(0) scale(1); }
+                }
+                .animate-jump {
+                    animation: jumpBounce 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
                 }
             `}</style>
         </div>
