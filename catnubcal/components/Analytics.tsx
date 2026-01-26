@@ -271,11 +271,74 @@ const Analytics: React.FC = () => {
       <div className="grid grid-cols-2 gap-4">
 
         {/* Card 1: Deep Health Tracker (Cholesterol Focus) */}
-        <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-hidden group">
+        <div className="bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm relative overflow-visible group">
           <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
             <span className="text-4xl">❤️</span>
           </div>
-          <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-2">สุขภาพหัวใจ (เฉลี่ย)</p>
+          <div className="flex justify-between items-center mb-2">
+            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">สุขภาพหัวใจ (เฉลี่ย)</p>
+            {/* Guide Hint */}
+            {(weeklyHighlights.avgCholesterol > 300 || weeklyHighlights.avgSodium > 2300) && (
+              <div className="group/guide relative">
+                <HelpCircle size={16} className="text-orange-400 cursor-help hover:scale-110 transition-transform" />
+                <div className="absolute top-8 left-1/2 -translate-x-1/2 w-80 bg-white text-slate-700 p-5 rounded-[2rem] shadow-2xl opacity-0 invisible group-hover/guide:opacity-100 group-hover/guide:visible transition-all duration-300 z-50 transform translate-y-2 group-hover/guide:translate-y-0 pointer-events-none group-hover/guide:pointer-events-auto border border-slate-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-xl">🩺</span>
+                    <h4 className="font-bold text-sm text-slate-800">คำแนะนำฟื้นฟู (Next 7 Days)</h4>
+                  </div>
+
+                  {weeklyHighlights.avgCholesterol > 300 && (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm">🩸</span>
+                          <span className="text-xs font-bold text-slate-700">Cholesterol</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-red-500">+{weeklyHighlights.avgCholesterol - 300}mg</span>
+                      </div>
+
+                      {/* Recommendation Box */}
+                      <div className="bg-white p-2 rounded-lg border border-slate-100 flex items-center justify-between">
+                        <span className="text-[10px] text-slate-500">เป้าหมาย/วัน</span>
+                        <span className="text-sm font-black text-emerald-500">
+                          &lt; {Math.max(150, 300 - Math.round((weeklyHighlights.avgCholesterol - 300) * 0.5))} mg
+                        </span>
+                      </div>
+                      <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">
+                        ลดของทอด/กะทิ เพื่อดึงค่าเฉลี่ยกลับมาปกติ
+                      </p>
+                    </div>
+                  )}
+
+                  {weeklyHighlights.avgSodium > 2300 && (
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm">🧂</span>
+                          <span className="text-xs font-bold text-slate-700">Sodium</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-orange-500">+{weeklyHighlights.avgSodium - 2300}mg</span>
+                      </div>
+
+                      {/* Recommendation Box */}
+                      <div className="bg-white p-2 rounded-lg border border-slate-100 flex items-center justify-between">
+                        <span className="text-[10px] text-slate-500">เป้าหมาย/วัน</span>
+                        <span className="text-sm font-black text-emerald-500">
+                          &lt; {Math.max(1500, 2300 - Math.round((weeklyHighlights.avgSodium - 2300) * 0.5))} mg
+                        </span>
+                      </div>
+                      <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">
+                        เลี่ยงน้ำซุป/ปรุงรส เพื่อลดอาการบวมน้ำ
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Decorative Arrow Center */}
+                  <div className="absolute -top-3 left-1/2 w-4 h-4 bg-white rotate-45 border-l border-t border-slate-100 transform -translate-x-1/2 z-0"></div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Cholesterol */}
           <div className="mb-3">

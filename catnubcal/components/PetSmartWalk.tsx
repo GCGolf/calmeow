@@ -20,7 +20,7 @@ const CAT_MESSAGES = [
     "วันนี้ทำได้ดีมากเก่งสุดๆ! 🌟",
     "พักผ่อนบ้าง..เป็นห่วงนะเมี๊ยว 🛌",
     "ลดน้ำตาลหน่อยนะเพื่อสุขภาพที่ดี 🍬",
-    "กินผักเยอะๆ นะเมี๊ยว 🥦",
+    "กินผักเยอะๆ นะเมี๊ยยว 🥦",
     "รักนะ เมี๊ยวๆ จุ๊บๆ ❤️",
     "ถ้าเหนื่อยก็พัก..มาเล่นกันเมี๊ยว 😺"
 ];
@@ -288,7 +288,7 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
     }, [isGoalReached]);
 
     return (
-        <div className="relative w-full h-48 mt-10 mb-6 group select-none">
+        <div className="relative z-0 w-full h-48 mt-10 mb-6 group select-none">
             {/* Background Pattern */}
             {/* Background Pattern or Cafe BG */}
             <div className={`absolute inset-0 pointer-events-none transition-all duration-500 ${streak >= 45 ? 'opacity-100' : 'opacity-20'}`}
@@ -401,14 +401,14 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({ onReset, currentCalories, g
             {streak >= 7 && (
                 <div
                     onClick={handleYarnClick}
-                    className="absolute bottom-0 left-[2%] w-10 h-10 opacity-90 drop-shadow-sm select-none pointer-events-auto cursor-pointer z-[70] hover:scale-110 transition-transform active:scale-95"
+                    className="absolute bottom-2 left-[2%] w-10 h-10 opacity-90 drop-shadow-sm select-none pointer-events-auto cursor-pointer z-[60] hover:scale-110 transition-transform active:scale-95"
                     title="รางวัลต่อเนื่อง 7 วัน (จิ้มเล่นได้เลย!)"
                 >
                     <span className="text-3xl filter brightness-110">🧶</span>
                 </div>
             )}
             {streak >= 14 && (
-                <div className="absolute bottom-0 right-[2%] w-12 h-12 opacity-90 drop-shadow-sm select-none pointer-events-none z-10" title="Streak 14+ Days Reward">
+                <div className="absolute bottom-2 right-[2%] w-12 h-12 opacity-90 drop-shadow-sm select-none pointer-events-none z-10" title="Streak 14+ Days Reward">
                     <span className="text-4xl filter brightness-110">📦</span>
                 </div>
             )}

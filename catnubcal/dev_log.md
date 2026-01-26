@@ -1,6 +1,6 @@
 # Developer Log - NekoFit Project
 **Last Updated:** 2026-01-25 12:45
-**Status:** Gamification (Visuals), Polish, Performance Optimized
+**Status:** Gamification Complete, Performance Refactored (GPU), Ready for QA
 
 ---
 
@@ -22,10 +22,18 @@
     - **Cafe Theme (Streak 45+)**:
         - Unlocks a "Cat Cafe" background wallpaper (Kawaii Pastel style).
         - Hides the default rug to show the cafe floor.
-### 2. Critical Bug Fixes & Refinements
+### 3. Performance Optimization (The "Butter Smooth" Update) 🚀
+- **Animation Refactor**: Switched `PetSmartWalk` from `left` property (Layout thrashing) to `transform: translateX` (GPU Composited).
+- **Result**: Significant smoothness improvement, especially on mobile devices.
+- **Asset Optimization**: Implemented lazy loading for new assets (Dual Cat, Cafe BG).
+- **Heart Health**: Added **Recovery Guide Tooltip** 🩺.
+    - Suggests daily intake targets when Cholesterol/Sodium exceeds limits.
+    - Premium Card UI with centered alignment.
+- **UI Fixes**: 
+    - Fixed Yarn Ball overlapping menus (Stacking Context Isolation z-60/z-0).
+    - Fixed Heart Health Card clipping (overflow-visible).
 - **Date Picker Fixes**: Resolved crash in `Dashboard.tsx`.
 - **Diary Tab Polish**: Removed redundant calendar header.
-- **Performance**: Verified smooth.
 
 ---
 
