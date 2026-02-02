@@ -1,0 +1,55 @@
+Pet Evolution System (Harvest Moon Style) - Analysis & Plan
+💡 Analysis of Your Idea
+"Excellent Idea! (10/10)" Integrating a Harvest Moon (Back to Nature) style system is a fantastic move for User Retention.
+
+Emotional Attachment: Watching the cat grow creates a bond.
+Daily Routine: "Once per day" logic encourages daily logins without requiring heavy grinding.
+Performance: Very lightweight. The logic is simple arithmetic, and visuals (scaling) are GPU-accelerated. No lag impact.
+🏗️ Technical Implementation Plan
+1. Data Structure (Database)
+We need to store the pet's state. I recommend adding a pet_stats JSONB column to the profiles table to keep it flexible.
+
+// pet_stats structure
+{
+  "affection": 0,          // 0 - 255 points
+  "last_pet_date": "2024-01-26", // To track daily "Pet" action
+  "last_play_date": "2024-01-26", // To track daily "Yarn" action
+  "last_feed_date": "2024-01-26"  // To track daily "Feeding"
+}
+2. The Logic (Harvest Moon Rules) 📜
+We will replicate the mechanics you described:
+
+Action	Points	Limit	Condition
+Pet/Click Cat (click)	+2	Once/Day	Only 1st click counts
+Play Yarn (yarn)	+2	Once/Day	Only 1st play counts
+Feed (log_food)	+2	Once/Day	First meal logged
+Neglect (Miss Login)	-1	Daily	If streak breaks (User doesn't open app)
+Over-click (Annoy)	-2	Unlimited	If clicked > 5 times fast (Angry mode)
+3. Growth Stages (Evolution) 🌱
+User requested 3 stages based on Hearts (1 Heart = 25 Points). We will use CSS Scale for smooth performance (no need to load 3 separate large images, just scale the one user chose).
+
+Stage 1: Kitten (Baby) 🍼
+Condition: Hearts < 3 (< 75 pts)
+Visual: Scale 60% (Small & Cute), Pitch higher meow?
+Stage 2: Junior (Teen) 🧢
+Condition: Hearts 3 - 6 (75 - 150 pts)
+Visual: Scale 80%
+Stage 3: Adult (Master) 👑
+Condition: Hearts 6+ (> 150 pts)
+Visual: Scale 100% (Full Size)
+4. UI Elements
+Heart Meter: Display 1-10 Hearts (❤️) somewhere (maybe hovering above cat on click, or in a "Pet Status" modal).
+Visual Feedback: When gaining affection, show a +❤️ floating animation.
+5. Performance Strategy (Zero Lag) ⚡
+To ensure "Smoothness":
+
+Optimistic UI: Update the UI instantly (Hearts go up, Cat grows).
+Background Save: Send the data to Supabase silently in the background. Don't block the UI waiting for the server.
+CSS Transforms: Use transform: scale() for growth. It’s GPU efficient.
+📝 User Decision Required
+Shall I proceed with this plan?
+
+Use CSS Scaling for growth? (Recommended: Smoothest & Supports User's Custom Image).
+Where to show Hearts?
+Option A: Always visible small bar.
+Option B: Only show when clicking the cat (Cleanest).

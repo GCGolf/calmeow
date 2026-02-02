@@ -937,13 +937,24 @@ const Dashboard: React.FC = () => {
                 {/* Streak + Weight Journey Row */}
                 <div className="flex gap-3 mb-5">
                     {/* Streak Counter - High Opacity Gradient (No Blur) */}
-                    <div className="flex-[1.5] bg-gradient-to-br from-orange-400/95 to-rose-400/95 p-4 rounded-[2rem] flex items-center gap-3 shadow-[0_10px_30px_rgba(244,63,94,0.2)] border border-white/20">
+                    <div className="flex-[1.5] bg-gradient-to-br from-orange-400/95 to-rose-400/95 p-4 rounded-[2rem] flex items-center gap-3 shadow-[0_10px_30px_rgba(244,63,94,0.2)] border border-white/20 relative">
                         <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center border border-white/30">
                             <span className="text-2xl drop-shadow-md">🔥</span>
                         </div>
                         <div>
                             <p className="text-white/80 text-[10px] font-bold uppercase tracking-wider">Streak</p>
                             <p className="font-header text-white text-2xl font-bold leading-none drop-shadow-sm">{streak} วัน</p>
+                        </div>
+                        {/* Test Buttons */}
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
+                            <button
+                                onClick={() => setStreak(prev => Math.max(0, prev - 1))}
+                                className="w-7 h-7 bg-white/30 hover:bg-white/50 rounded-full text-white font-bold text-sm transition-all"
+                            >-</button>
+                            <button
+                                onClick={() => setStreak(prev => prev + 1)}
+                                className="w-7 h-7 bg-white/30 hover:bg-white/50 rounded-full text-white font-bold text-sm transition-all"
+                            >+</button>
                         </div>
                     </div>
 
