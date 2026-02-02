@@ -945,17 +945,7 @@ const Dashboard: React.FC = () => {
                             <p className="text-white/80 text-[10px] font-bold uppercase tracking-wider">Streak</p>
                             <p className="font-header text-white text-2xl font-bold leading-none drop-shadow-sm">{streak} วัน</p>
                         </div>
-                        {/* Test Buttons */}
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
-                            <button
-                                onClick={() => setStreak(prev => Math.max(0, prev - 1))}
-                                className="w-7 h-7 bg-white/30 hover:bg-white/50 rounded-full text-white font-bold text-sm transition-all"
-                            >-</button>
-                            <button
-                                onClick={() => setStreak(prev => prev + 1)}
-                                className="w-7 h-7 bg-white/30 hover:bg-white/50 rounded-full text-white font-bold text-sm transition-all"
-                            >+</button>
-                        </div>
+
                     </div>
 
                     {/* Weight Journey - Solid/High Opacity (No Blur) */}
