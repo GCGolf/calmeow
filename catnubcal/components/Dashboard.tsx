@@ -945,6 +945,8 @@ const Dashboard: React.FC = () => {
                             <p className="text-white/80 text-[10px] font-bold uppercase tracking-wider">Streak</p>
                             <p className="font-header text-white text-2xl font-bold leading-none drop-shadow-sm">{streak} วัน</p>
                         </div>
+                        {/* Test Buttons */}
+
 
                     </div>
 

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Camera, RefreshCw } from 'lucide-react';
+import { Camera, RefreshCw, PawPrint } from 'lucide-react';
 
 interface PetSmartWalkProps {
     onReset?: () => void;
@@ -18,6 +18,16 @@ const CAT_MESSAGES = [
     "ถ้าเหนื่อยก็พัก..มาเล่นกันเมี๊ยว 😺"
 ];
 
+const FRIEND_MESSAGES = [
+    "เมี๊ยว? 😼",
+    "ไรอ่ะ? 😽",
+    "หิวเปียก!",
+    "ยุ่งจัง 😾",
+    "เมี๊ยววว~ 🎵",
+    "มองทามไม? 👀",
+    "ว่างงายยย~"
+];
+
 // ========== SIMPLE STATE ==========
 type CatMode = 'walking' | 'sleeping' | 'playing' | 'goal';
 
@@ -26,15 +36,27 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
 }) => {
     // ========== STATE ==========
     const [catMode, setCatMode] = useState<CatMode>('walking');
+    const [friendMode, setFriendMode] = useState<CatMode>('walking'); // [NEW] Friend Mode
+    const [selectedCat, setSelectedCat] = useState<'main' | 'friend'>('main'); // [NEW] Selection State
+
     const [message, setMessage] = useState('');
     const [showMessage, setShowMessage] = useState(false);
+
+    // [NEW] Friend Message State
+    const [friendMessage, setFriendMessage] = useState('');
+    const [showFriendMessage, setShowFriendMessage] = useState(false);
+
     const [customImage, setCustomImage] = useState<string | null>(null);
     const [clickCount, setClickCount] = useState(0);
 
     // Refs for DOM manipulation (no re-renders)
     const containerRef = useRef<HTMLDivElement>(null);
     const directionRef = useRef<HTMLDivElement>(null);
+    const friendContainerRef = useRef<HTMLDivElement>(null); // [NEW] Friend Ref
+    const friendDirectionRef = useRef<HTMLDivElement>(null); // [NEW] Friend Direction Ref
+
     const messageTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const friendMessageTimerRef = useRef<NodeJS.Timeout | null>(null); // [NEW]
     const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     const isGoalReached = goalCalories > 0 && currentCalories >= goalCalories;
@@ -46,6 +68,14 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
 
         if (messageTimerRef.current) clearTimeout(messageTimerRef.current);
         messageTimerRef.current = setTimeout(() => setShowMessage(false), duration);
+    };
+
+    const showFriendBubble = (text: string, duration = 3000) => {
+        setFriendMessage(text);
+        setShowFriendMessage(true);
+
+        if (friendMessageTimerRef.current) clearTimeout(friendMessageTimerRef.current);
+        friendMessageTimerRef.current = setTimeout(() => setShowFriendMessage(false), duration);
     };
 
     // ========== RANDOM MESSAGES (while walking) ==========
@@ -103,18 +133,24 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
     };
 
     // Helper: Smooth move cat to position with direction
-    const smoothMoveTo = (targetLeft: string, faceLeft: boolean, callback?: () => void) => {
-        if (!containerRef.current) return;
-        const el = containerRef.current;
+    const smoothMoveTo = (
+        elRef: React.RefObject<HTMLDivElement>,
+        dirRef: React.RefObject<HTMLDivElement>,
+        targetLeft: string,
+        faceLeft: boolean,
+        callback?: () => void
+    ) => {
+        if (!elRef.current) return;
+        const el = elRef.current;
 
         // Get current computed left position
         const computed = window.getComputedStyle(el);
         const currentLeft = computed.left;
 
         // Flip cat to face the direction of movement
-        if (directionRef.current) {
-            directionRef.current.style.animation = 'none';
-            directionRef.current.style.transform = faceLeft ? 'scaleX(-1)' : 'scaleX(1)';
+        if (dirRef.current) {
+            dirRef.current.style.animation = 'none';
+            dirRef.current.style.transform = faceLeft ? 'scaleX(-1)' : 'scaleX(1)';
         }
 
         // Pause animation and set current position
@@ -134,48 +170,80 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
 
     const handleCondoClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (catMode === 'sleeping') return;
 
-        // Move smoothly to condo (face right)
-        smoothMoveTo('58%', false, () => {
-            setCatMode('sleeping');
-            showBubble("หลับแปป...zzZ 😴", 999999);
-        });
+        if (selectedCat === 'main') {
+            if (catMode === 'sleeping') return;
+            // Move smoothly to condo (face right)
+            smoothMoveTo(containerRef, directionRef, '58%', false, () => {
+                setCatMode('sleeping');
+                showBubble("หลับแปป...zzZ 😴", 999999);
+            });
+        } else {
+            // Friend Cat
+            if (friendMode === 'sleeping') return;
+            smoothMoveTo(friendContainerRef, friendDirectionRef, '65%', false, () => {
+                setFriendMode('sleeping');
+                showFriendBubble("ของีบนะ...💤", 999999);
+            });
+        }
     };
 
     const handleYarnClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (catMode === 'sleeping' || catMode === 'playing') return;
 
-        // Move smoothly to yarn (face left)
-        smoothMoveTo('12%', true, () => {
-            setCatMode('playing');
-            showBubble("เมี๊ยววว 🧶", 2000);
-        });
+        if (selectedCat === 'main') {
+            if (catMode === 'sleeping' || catMode === 'playing') return;
+            // Move smoothly to yarn (face left)
+            smoothMoveTo(containerRef, directionRef, '12%', true, () => {
+                setCatMode('playing');
+                showBubble("เมี๊ยววว 🧶", 2000);
+            });
+            // Return to walking after 3.5 seconds
+            setTimeout(() => {
+                if (containerRef.current) {
+                    containerRef.current.style.transition = '';
+                    containerRef.current.style.animation = '';
+                    containerRef.current.style.left = '';
+                }
+                if (directionRef.current) {
+                    directionRef.current.style.transform = '';
+                    directionRef.current.style.animation = '';
+                }
+                setCatMode('walking');
+            }, 3500);
 
-        // Yarn bounce animation
+        } else {
+            // Friend Cat
+            if (friendMode === 'sleeping' || friendMode === 'playing') return;
+            smoothMoveTo(friendContainerRef, friendDirectionRef, '12%', true, () => {
+                setFriendMode('playing');
+                showFriendBubble("สนุกจัง! 🧶✨", 2000);
+            });
+            // Return to walking after 3.5 seconds
+            setTimeout(() => {
+                if (friendContainerRef.current) {
+                    friendContainerRef.current.style.transition = '';
+                    friendContainerRef.current.style.animation = '';
+                    friendContainerRef.current.style.left = '';
+                }
+                if (friendDirectionRef.current) {
+                    friendDirectionRef.current.style.transform = '';
+                    friendDirectionRef.current.style.animation = '';
+                }
+                setFriendMode('walking');
+            }, 3500);
+        }
+
+        // Yarn bounce animation (Common)
         const target = e.currentTarget as HTMLElement;
         target.style.animation = 'none';
         target.offsetHeight;
         target.style.animation = 'yarnBounce 0.4s ease-out';
-
-        // Return to walking after 3.5 seconds (1s move + 2.5s play)
-        setTimeout(() => {
-            if (containerRef.current) {
-                containerRef.current.style.transition = '';
-                containerRef.current.style.animation = '';
-                containerRef.current.style.left = '';
-            }
-            if (directionRef.current) {
-                directionRef.current.style.transform = '';
-                directionRef.current.style.animation = '';
-            }
-            setCatMode('walking');
-        }, 3500);
     };
 
 
     const handleAreaClick = () => {
+        let invoked = false;
         if (catMode === 'sleeping') {
             // Reset styles to allow CSS animation to take over
             if (containerRef.current) {
@@ -189,8 +257,23 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
             }
             setCatMode('walking');
             showBubble("อ๊า...ตื่นแล้วเมี๊ยว 😺", 2000);
+            invoked = true;
         }
 
+        if (friendMode === 'sleeping') {
+            if (friendContainerRef.current) {
+                friendContainerRef.current.style.transition = '';
+                friendContainerRef.current.style.animation = '';
+                friendContainerRef.current.style.left = '';
+            }
+            if (friendDirectionRef.current) {
+                friendDirectionRef.current.style.transform = '';
+                friendDirectionRef.current.style.animation = '';
+            }
+            setFriendMode('walking');
+            setFriendMode('walking');
+            if (!invoked) showFriendBubble("ตื่นแล้วฮับ! 🐱", 2000);
+        }
     };
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -257,15 +340,84 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
                 )}
             </div>
 
+
+            {/* ========== FRIEND CAT (Streak 30+) ========== */}
+            {streak >= 30 && (
+                <div
+                    ref={friendContainerRef}
+                    className={`friend-container cursor-pointer ${friendMode === 'walking' ? 'friend-walking-mode' : ''} ${friendMode === 'sleeping' ? 'friend-sleeping-mode' : ''} ${friendMode === 'playing' ? 'friend-playing-mode' : ''}`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        // Select Friend
+                        setSelectedCat('friend');
+
+                        if (friendMode === 'sleeping') {
+                            setFriendMode('walking');
+                            if (friendContainerRef.current) {
+                                friendContainerRef.current.style.transition = '';
+                                friendContainerRef.current.style.animation = '';
+                                friendContainerRef.current.style.left = '';
+                            }
+                            if (friendDirectionRef.current) {
+                                friendDirectionRef.current.style.transform = '';
+                                friendDirectionRef.current.style.animation = '';
+                            }
+                            showBubble("เมี้ยวว? 🐱", 1500);
+                        } else {
+                            // Petting logic for friend (Cheeky Random)
+                            const msg = FRIEND_MESSAGES[Math.floor(Math.random() * FRIEND_MESSAGES.length)];
+                            showFriendBubble(msg, 1500);
+                        }
+                    }}
+                >
+                    {/* Selection Indicator Arrow */}
+                    {selectedCat === 'friend' && (
+                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 animate-bounce">
+                            <span className="text-2xl filter drop-shadow-sm select-none">🐾</span>
+                        </div>
+                    )}
+
+                    {/* Friend Message Bubble */}
+                    {showFriendMessage && (
+                        <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white px-3 py-1.5 rounded-2xl border border-orange-100 font-bold text-xs text-slate-700 whitespace-nowrap shadow-md z-[100] pointer-events-none animate-bounce-in">
+                            {friendMessage}
+                            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-white" />
+                        </div>
+                    )}
+
+                    <div ref={friendDirectionRef} className="friend-direction">
+                        <div className="relative w-full h-full flex justify-center items-end">
+                            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-[60%] h-3 bg-black/20 blur-sm rounded-full friend-shadow" />
+                            <img
+                                src="/cat2.png"
+                                alt="Friend Cat"
+                                className={`w-full h-auto relative z-10 drop-shadow-sm select-none friend-image ${selectedCat === 'friend' ? 'brightness-110 drop-shadow-[0_0_8px_rgba(251,146,60,0.6)]' : ''}`}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ========== CAT ========== */}
             <div
                 ref={containerRef}
-                className={`absolute bottom-2 w-32 md:w-36 z-50 cursor-pointer cat-container ${catMode === 'walking' ? 'walking-mode' : ''} ${catMode === 'sleeping' ? 'sleeping-mode' : ''} ${catMode === 'playing' ? 'playing-mode' : ''} ${catMode === 'goal' ? 'goal-mode' : ''}`}
-                onClick={handleCatClick}
+                className={`absolute bottom-0 w-32 md:w-36 z-50 cursor-pointer cat-container ${catMode === 'walking' ? 'walking-mode' : ''} ${catMode === 'sleeping' ? 'sleeping-mode' : ''} ${catMode === 'playing' ? 'playing-mode' : ''} ${catMode === 'goal' ? 'goal-mode' : ''}`}
+                onClick={(e) => {
+                    // Select Main
+                    setSelectedCat('main');
+                    handleCatClick();
+                }}
             >
+                {/* Selection Indicator Arrow */}
+                {selectedCat === 'main' && streak >= 30 && (
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 animate-bounce">
+                        <span className="text-2xl filter drop-shadow-sm select-none">🐾</span>
+                    </div>
+                )}
+
                 {/* Message Bubble */}
                 {showMessage && (
-                    <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-white px-4 py-2 rounded-2xl border border-orange-100 font-bold text-sm text-slate-700 whitespace-nowrap shadow-lg z-[100] pointer-events-none animate-bounce-in">
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white px-4 py-2 rounded-2xl border border-orange-100 font-bold text-sm text-slate-700 whitespace-nowrap shadow-lg z-[100] pointer-events-none animate-bounce-in">
                         {message}
                         <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-t-8 border-t-white" />
                     </div>
@@ -276,25 +428,15 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
 
                     <div className={`cat-body w-full h-full flex justify-center items-end relative ${clickCount > 4 ? 'angry' : ''}`}>
                         {/* Shadow */}
-                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-[60%] h-3 bg-black/10 blur-sm rounded-full cat-shadow" />
+                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-[60%] h-3 bg-black/20 blur-sm rounded-full cat-shadow" />
 
                         {/* Cat Image */}
                         <img
                             src={getImageSrc()}
                             alt="My Cat"
                             loading="lazy"
-                            className="w-full h-auto relative z-10 drop-shadow-sm select-none cat-image"
+                            className={`w-full h-auto relative z-10 drop-shadow-sm select-none cat-image ${selectedCat === 'main' ? 'drop-shadow-[0_0_8px_rgba(251,146,60,0.6)]' : ''}`}
                         />
-
-                        {/* Second Cat (Streak 30+) */}
-                        {streak >= 30 && catMode !== 'sleeping' && (
-                            <img
-                                src="/cat2.png"
-                                alt="Friend Cat"
-                                loading="lazy"
-                                className="absolute -left-8 bottom-0 w-full h-auto z-0 drop-shadow-sm select-none opacity-90"
-                            />
-                        )}
                     </div>
                 </div>
             </div>
@@ -304,7 +446,7 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
                 <div
                     onClick={handleYarnClick}
                     className="absolute bottom-2 left-[2%] w-10 h-10 z-[60] cursor-pointer hover:scale-110 transition-transform"
-                    title="ลูกไหมพรม"
+                    title={`ลูกไหมพรม ${selectedCat === 'main' ? '(ให้พี่ส้ม)' : '(ให้น้องเทา)'}`}
                 >
                     <span className="text-3xl">🧶</span>
                 </div>
@@ -315,7 +457,7 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
                 <div
                     onClick={handleCondoClick}
                     className="absolute bottom-2 right-[2%] w-28 h-28 z-10 cursor-pointer hover:scale-105 transition-transform"
-                    title="คอนโดแมว - จิ้มให้แมวนอน!"
+                    title={`คอนโดแมว ${selectedCat === 'main' ? '(ให้พี่ส้ม)' : '(ให้น้องเทา)'}`}
                 >
                     <img src="/cat_condo.png" alt="Cat Condo" className="w-full h-full object-contain" />
                 </div>
@@ -323,6 +465,70 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
 
             {/* ========== CSS ANIMATIONS ========== */}
             <style>{`
+                /* ===== FRIEND CAT ANIMATIONS ===== */
+                .friend-container {
+                    position: absolute;
+                    bottom: 0.8rem; /* Adjusted to ground the cat better */
+                    width: 7rem; /* Smaller than main cat */
+                    z-index: 40; /* Behind main cat */
+                    transition: filter 0.3s;
+                }
+                .friend-image {
+                   /* Fixed: Use normal alternate to prevent jitter/pop */
+                   animation: catWaddle 0.9s ease-in-out infinite alternate;
+                }
+                .friend-walking-mode {
+                    animation: friendWalkPath 28s linear infinite; /* Increased time, linear for smoother path */
+                }
+                .friend-walking-mode .friend-direction {
+                    animation: friendFlipDirection 28s steps(1) infinite;
+                }
+
+                /* Selection Effect */
+                .cat-image, .friend-image {
+                    transition: filter 0.3s, drop-shadow 0.3s;
+                }
+
+                /* Friend Interactions */
+                .friend-sleeping-mode {
+                    left: 65% !important; /* Offset from main cat (58%) */
+                    animation: none !important;
+                }
+                .friend-sleeping-mode .friend-image {
+                    transform: scaleY(0.85) translateY(6px);
+                    animation: none !important;
+                     transition: transform 0.5s ease-out 1.3s;
+                }
+                .friend-sleeping-mode .friend-direction {
+                    transform: scaleX(1) !important;
+                    animation: none !important;
+                }
+
+                .friend-playing-mode {
+                    left: 12% !important; /* Offset from main cat (10-12%) */
+                    animation: none !important;
+                    transition: left 1s ease-out;
+                }
+                .friend-playing-mode .friend-image {
+                    animation: catWaddle 0.4s ease-in-out infinite alternate !important;
+                }
+                .friend-playing-mode .friend-direction {
+                    transform: scaleX(-1) !important;
+                    animation: none !important;
+                    transition: none;
+                }
+
+
+                @keyframes friendWalkPath {
+                    0%, 100% { left: 75%; }
+                    50% { left: 5%; }
+                }
+
+                @keyframes friendFlipDirection {
+                    0%, 50% { transform: scaleX(-1); } /* Face Left (Moving 90 -> 20) */
+                    50.01%, 100% { transform: scaleX(1); } /* Face Right (Moving 20 -> 90) */
+                }
+
                 /* ===== WALKING MODE: Pure CSS Animation ===== */
                 .walking-mode {
                     animation: catWalkPath 20s ease-in-out infinite;
@@ -369,9 +575,9 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
 
                 /* ===== PLAYING MODE (Yarn) ===== */
                 .playing-mode {
-                    left: 10% !important;
+                    left: 12% !important;
                     animation: none !important;
-                    transition: left 0.8s ease-out;
+                    transition: left 1s ease-in-out; 
                 }
                 .playing-mode .cat-image {
                     animation: catWaddle 0.4s ease-in-out infinite alternate !important;
@@ -379,6 +585,7 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
                 .playing-mode .cat-direction {
                     transform: scaleX(-1) !important;
                     animation: none !important;
+                    transition: none; /* Fix transition accumulation */
                 }
 
                 /* ===== ANGRY ===== */
@@ -437,7 +644,12 @@ const PetSmartWalk: React.FC<PetSmartWalkProps> = ({
                     .walking-mode,
                     .walking-mode .cat-direction,
                     .walking-mode .cat-image,
-                    .walking-mode .cat-shadow {
+                    .walking-mode .cat-shadow,
+                    .friend-container,
+                    .friend-walking-mode,
+                    .friend-direction, /* Added explicit class */
+                    .friend-image,
+                    .friend-shadow {
                         animation: none !important;
                     }
                 }
