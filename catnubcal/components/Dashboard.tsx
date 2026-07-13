@@ -40,6 +40,46 @@ import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../services/AuthContext';
 import FavoriteMenuModal from './FavoriteMenuModal';
 
+// Helper to compress image before converting to base64
+const compressImageBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 400; // Limit width to 400px (thumbnail size)
+                const MAX_HEIGHT = 400; // Limit height to 400px
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+                // Compress to JPEG with 0.6 quality
+                resolve(canvas.toDataURL('image/jpeg', 0.6));
+            };
+            img.onerror = reject;
+        };
+        reader.onerror = reject;
+    });
+};
+
 const Dashboard: React.FC = () => {
     const { user, signOut } = useAuth();
     const navigate = useNavigate();
@@ -521,20 +561,10 @@ const Dashboard: React.FC = () => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Read image as base64 and wait for it to complete
-        const readImageAsBase64 = (file: File): Promise<string> => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-        };
-
         setIsScanning(true);
         try {
-            // Wait for image to be read first
-            const capturedImage = await readImageAsBase64(file);
+            // Compress and wait for image to be read
+            const capturedImage = await compressImageBase64(file);
             setPreviewImage(capturedImage); // Show preview
 
             const result = await analyzeFoodImage(file);
@@ -637,12 +667,15 @@ const Dashboard: React.FC = () => {
         }
     };
 
-    const handleManualImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleManualImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onloadend = () => setPreviewImage(reader.result as string);
-        reader.readAsDataURL(file);
+        try {
+            const compressed = await compressImageBase64(file);
+            setPreviewImage(compressed);
+        } catch (err) {
+            console.error("Error compressing image:", err);
+        }
     };
 
     const handleManualSubmit = async (e: any) => {
