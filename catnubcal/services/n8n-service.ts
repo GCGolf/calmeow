@@ -3,19 +3,13 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { FoodItem } from '../types';
 
 /**
- * Helper to convert a File object to a base64 string for the Gemini API.
+ * Helper to convert a File object to a base64 string
  */
-const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: string; mimeType: string } }> => {
+const fileToBase64 = async (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
-      const base64Data = (reader.result as string).split(',')[1];
-      resolve({
-        inlineData: {
-          data: base64Data,
-          mimeType: file.type,
-        },
-      });
+      resolve(reader.result as string);
     };
     reader.onerror = reject;
     reader.readAsDataURL(file);
@@ -23,61 +17,74 @@ const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: s
 };
 
 /**
- * Analyzes a food image using the Gemini API.
- * Replaces the previous webhook-based approach to ensure reliability and higher accuracy.
+ * Analyzes a food image using the OpenRouter API.
  * @param file The image file to analyze
  * @returns A partial FoodItem object with nutritional data
  */
 export const analyzeFoodImage = async (file: File): Promise<Partial<FoodItem>> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const imagePart = await fileToGenerativePart(file);
+    const base64Image = await fileToBase64(file);
 
     const prompt = `You are an expert Thai Nutritionist analyzing food images.
 
     RULES:
     1. **Simple Foods ARE Valid**: Even if you only see plain steamed white rice by itself with NO side dishes, that IS food. Identify it as "ข้าวสวย" (approximately 200 kcal per serving). Do NOT return empty just because there's no curry or toppings.
-       - White/Steamed Rice alone = "ข้าวสวย"
-       - Bread or Toast = "ขนมปัง"
-       - Sandwich = "แซนด์วิช" (describe fillings if visible)
-       - Boiled Egg = "ไข่ต้ม"
     2. **Complex Dishes**: For dishes with multiple components, list all visible items in the name.
     3. **Thai Names**: Always use Thai dish names.
     4. **Accurate Estimates**: Use standard Thai serving sizes for nutrition values.
-    5. Return valid JSON matching the schema. Never return empty name or 0 calories for real food.`;
+    5. Return ONLY a valid JSON object matching the exact schema below. Do not include markdown code blocks like \`\`\`json or any other text.
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: { parts: [imagePart, { text: prompt }] },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            name: { type: Type.STRING, description: 'The name of the food dish in Thai' },
-            calories: { type: Type.NUMBER, description: 'Estimated calories' },
-            protein: { type: Type.NUMBER, description: 'Estimated protein in grams' },
-            carbs: { type: Type.NUMBER, description: 'Estimated carbohydrates in grams' },
-            fat: { type: Type.NUMBER, description: 'Estimated fat in grams' },
-            fiber: { type: Type.NUMBER, description: 'Estimated fiber in grams' },
-            sugar: { type: Type.NUMBER, description: 'Estimated sugar in grams' },
-            sodium: { type: Type.NUMBER, description: 'Estimated sodium in milligrams' },
-            cholesterol: { type: Type.NUMBER, description: 'Estimated cholesterol in milligrams' },
-            servingSize: {
-              type: Type.OBJECT,
-              properties: {
-                unit: { type: Type.STRING, description: 'Unit of measurement (e.g., จาน, ชาม, ชิ้น)' },
-                quantity: { type: Type.NUMBER }
-              },
-              required: ['unit', 'quantity']
-            }
-          },
-          required: ['name', 'calories', 'protein', 'carbs', 'fat'],
-        },
+    EXPECTED JSON FORMAT:
+    {
+      "name": "string (Thai dish name)",
+      "calories": number,
+      "protein": number,
+      "carbs": number,
+      "fat": number,
+      "fiber": number,
+      "sugar": number,
+      "sodium": number,
+      "cholesterol": number,
+      "servingSize": {
+        "unit": "string",
+        "quantity": number
+      }
+    }`;
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "CalMeow"
       },
+      body: JSON.stringify({
+        model: "google/gemini-3.1-flash-lite", // User requested model on OpenRouter
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: base64Image } }
+            ]
+          }
+        ]
+      })
     });
 
-    const result = JSON.parse(response.text || '{}');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`OpenRouter API error: ${response.status} ${errorData.error?.message || ''}`);
+    }
+
+    const data = await response.json();
+    let textResponse = data.choices[0].message.content;
+    
+    // Clean up potential markdown formatting (```json ... ```)
+    textResponse = textResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    const result = JSON.parse(textResponse);
 
     return {
       name: result.name || 'อาหารที่ระบุไม่ได้',
@@ -92,7 +99,7 @@ export const analyzeFoodImage = async (file: File): Promise<Partial<FoodItem>> =
       servingSize: result.servingSize || { unit: 'ที่', quantity: 1 }
     };
   } catch (error) {
-    console.error('Gemini AI Analysis Error:', error);
+    console.error('OpenRouter AI Analysis Error:', error);
     throw new Error('ไม่สามารถวิเคราะห์รูปภาพได้ในขณะนี้ โปรดลองอีกครั้งหรือกรอกข้อมูลด้วยตนเอง');
   }
 };
@@ -142,21 +149,78 @@ const THAI_FOOD_DB: FoodSuggestion[] = [
 ];
 
 /**
- * Suggests 3 foods based on remaining calories using local Thai food database.
- * No API key required - works offline!
+ * Suggests 3 foods based on remaining calories using OpenRouter AI.
  */
 export const suggestFoodByCalories = async (remainingCalories: number): Promise<FoodSuggestion[]> => {
-  // กรองอาหารที่แคลอรี่ไม่เกินที่เหลือ
-  const eligible = THAI_FOOD_DB.filter(f => f.calories <= remainingCalories);
-  
-  if (eligible.length === 0) {
-    // ถ้าไม่มีอาหารที่พอดี ให้แสดงอาหารที่แคลอรี่ต่ำสุด 3 ชนิด
-    return [...THAI_FOOD_DB]
-      .sort((a, b) => a.calories - b.calories)
-      .slice(0, 3);
-  }
+  try {
+    // Inject a random seed to ensure varied responses if the user clicks multiple times
+    const randomSeed = Math.floor(Math.random() * 10000);
+    const prompt = `You are an expert Thai Nutritionist. The user has ${remainingCalories} kcal remaining for today.
+    Suggest 3 different Thai dishes that fit within this calorie limit (each dish should have <= ${remainingCalories} kcal).
+    Make the suggestions highly varied and creative (e.g. mix of noodles, rice, salads, soups, or snacks). 
+    Random Seed: ${randomSeed} (Use this to randomize your selection).
+    
+    Return ONLY a valid JSON array of objects matching this exact schema:
+    [
+      {
+        "name": "string (Thai dish name)",
+        "calories": number,
+        "protein": number,
+        "carbs": number,
+        "fat": number,
+        "description": "string (short description of why it's good in Thai)",
+        "emoji": "string (1 relevant emoji)"
+      }
+    ]
+    Do not include markdown blocks like \`\`\`json or any other text. Return only the raw JSON array.`;
 
-  // สุ่มเลือก 3 รายการที่หลากหลาย (ไม่ซ้ำ)
-  const shuffled = [...eligible].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, 3);
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "http://localhost:3000",
+        "X-Title": "CalMeow"
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3.1-flash-lite", // Using the same model as image analysis
+        temperature: 0.9, // Increase temperature for more variety
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`OpenRouter API error: ${response.status} ${errorData.error?.message || ''}`);
+    }
+
+    const data = await response.json();
+    let textResponse = data.choices[0].message.content;
+    
+    // Clean up potential markdown formatting
+    textResponse = textResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    const result = JSON.parse(textResponse);
+    
+    if (Array.isArray(result) && result.length > 0) {
+      return result;
+    }
+    
+    throw new Error('Invalid format returned');
+  } catch (error) {
+    console.error('AI Food Suggestion Error:', error);
+    
+    // Fallback to offline database if API fails
+    const eligible = THAI_FOOD_DB.filter(f => f.calories <= remainingCalories);
+    if (eligible.length === 0) {
+      return [...THAI_FOOD_DB].sort((a, b) => a.calories - b.calories).slice(0, 3);
+    }
+    const shuffled = [...eligible].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 3);
+  }
 };
