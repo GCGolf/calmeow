@@ -30,7 +30,7 @@ import {
 import { FoodItem, UserStats, PetState } from '../types';
 import { INITIAL_USER_STATS, MOCK_DAILY_LOGS } from '../mockData';
 import { calculateHealthScore, determinePetState } from '../services/health-logic';
-import { analyzeFoodImage } from '../services/n8n-service';
+import { analyzeFoodImage, suggestFoodByCalories, FoodSuggestion } from '../services/n8n-service';
 import PetSmartWalk from './PetSmartWalk';
 import WaterTracker from './WaterTracker';
 import FoodList from './FoodList'; // [NEW]
@@ -63,6 +63,12 @@ const Dashboard: React.FC = () => {
     const [showPortionInput, setShowPortionInput] = useState(false); // [NEW] Custom portion input state
     const [isEditingMacros, setIsEditingMacros] = useState(false); // [NEW] Toggle Edit Mode
     const [feedTrigger, setFeedTrigger] = useState(0); // [NEW] Trigger for Pet Feeding Animation
+
+    // AI Assistant State
+    const [showAIPanel, setShowAIPanel] = useState(false);
+    const [aiSuggestions, setAiSuggestions] = useState<FoodSuggestion[]>([]);
+    const [isAILoading, setIsAILoading] = useState(false);
+    const [aiError, setAiError] = useState<string | null>(null);
 
     // Check if current food is favorited when selectedFood changes
     useEffect(() => {
@@ -1163,7 +1169,93 @@ const Dashboard: React.FC = () => {
 
                 {activeTab === 'diary' && (
                     <>
-                        <div className="space-y-8 pb-20">
+                        <div className="space-y-4 pb-20">
+
+                            {/* AI Assistant Button */}
+                            <button
+                                onClick={async () => {
+                                    const consumed = foodLog.reduce((sum, f) => sum + f.calories, 0);
+                                    const remaining = Math.max(0, (userStats.tdee || 0) - consumed);
+                                    if (remaining <= 0) {
+                                        alert('คุณกินครบเป้าหมายแคลอรี่วันนี้แล้ว! 🎉');
+                                        return;
+                                    }
+                                    setShowAIPanel(true);
+                                    setAiSuggestions([]);
+                                    setAiError(null);
+                                    setIsAILoading(true);
+                                    try {
+                                        const suggestions = await suggestFoodByCalories(remaining);
+                                        setAiSuggestions(suggestions);
+                                    } catch (err: any) {
+                                        setAiError(err.message || 'เกิดข้อผิดพลาด');
+                                    } finally {
+                                        setIsAILoading(false);
+                                    }
+                                }}
+                                className="w-full flex items-center gap-3 bg-gradient-to-r from-violet-500 to-purple-600 text-white px-5 py-4 rounded-[2rem] shadow-lg shadow-purple-200 active:scale-[0.98] transition-all"
+                            >
+                                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
+                                    <Sparkles className="w-5 h-5" />
+                                </div>
+                                <div className="text-left">
+                                    <p className="font-black text-sm">AI แนะนำเมนูวันนี้</p>
+                                    <p className="text-xs text-white/70">แนะนำ 3 เมนูจากแคลอรี่ที่เหลือ</p>
+                                </div>
+                                <Sparkles className="w-4 h-4 ml-auto opacity-60" />
+                            </button>
+
+                            {/* AI Suggestions Panel */}
+                            {showAIPanel && (
+                                <div className="bg-white rounded-[2rem] border border-purple-100 shadow-sm overflow-hidden">
+                                    <div className="flex items-center justify-between px-5 py-4 border-b border-purple-50">
+                                        <div className="flex items-center gap-2">
+                                            <Sparkles className="w-4 h-4 text-purple-500" />
+                                            <span className="font-black text-slate-800 text-sm">เมนูแนะนำโดย AI</span>
+                                        </div>
+                                        <button
+                                            onClick={() => setShowAIPanel(false)}
+                                            className="w-7 h-7 flex items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 text-xs"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+
+                                    {isAILoading && (
+                                        <div className="flex flex-col items-center justify-center py-10 gap-3">
+                                            <div className="w-10 h-10 border-4 border-purple-200 border-t-purple-500 rounded-full animate-spin" />
+                                            <p className="text-sm text-slate-400 font-medium">AI กำลังคิดเมนูให้คุณ...</p>
+                                        </div>
+                                    )}
+
+                                    {aiError && (
+                                        <div className="px-5 py-6 text-center">
+                                            <p className="text-sm text-red-400">{aiError}</p>
+                                        </div>
+                                    )}
+
+                                    {!isAILoading && !aiError && aiSuggestions.map((s, i) => (
+                                        <div key={i} className={`px-5 py-4 flex items-start gap-4 ${i < aiSuggestions.length - 1 ? 'border-b border-slate-50' : ''}`}>
+                                            <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-2xl shrink-0">
+                                                {s.emoji}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <h4 className="font-black text-slate-800 text-sm truncate">{s.name}</h4>
+                                                    <span className="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full shrink-0">{s.calories} kcal</span>
+                                                </div>
+                                                <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{s.description}</p>
+                                                <div className="flex gap-3 mt-2">
+                                                    <span className="text-[10px] font-bold text-cyan-500">P: {s.protein}g</span>
+                                                    <span className="text-[10px] font-bold text-orange-400">C: {s.carbs}g</span>
+                                                    <span className="text-[10px] font-bold text-lime-500">F: {s.fat}g</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             <div className="bg-white p-8 rounded-[3rem] border border-[#F1EFE9] shadow-[0_20px_40px_rgba(0,0,0,0.02)] flex justify-between items-center">
                                 <div className="space-y-1">
                                     <h3 className="text-xl font-black text-slate-800">บันทึกอาหาร</h3>

@@ -198,7 +198,7 @@ const ProfilePage: React.FC = () => {
                     <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest px-2">📊 ข้อมูลร่างกาย</h3>
                     <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-sm divide-y divide-white/40">
                         {[
-                            { icon: '👤', label: 'เพศ', value: profile?.gender === 'female' ? 'หญิง' : 'ชาย' },
+                            { icon: '👤', label: 'เพศ', value: profile?.gender?.toLowerCase() === 'female' ? 'หญิง' : profile?.gender?.toLowerCase() === 'male' ? 'ชาย' : 'อื่นๆ' },
                             { icon: '🎂', label: 'อายุ', value: `${profile?.age} ปี` },
                             { icon: '📏', label: 'ส่วนสูง', value: `${profile?.height} ซม.` },
                             { icon: '⚖️', label: 'น้ำหนักปัจจุบัน', value: `${profile?.weight} กก.` },
