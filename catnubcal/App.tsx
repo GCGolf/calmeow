@@ -45,6 +45,10 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }
 
   if (user) {
+    if (localStorage.getItem('isNewUser') === 'true') {
+      localStorage.removeItem('isNewUser');
+      return <Navigate to="/onboarding" replace />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
 

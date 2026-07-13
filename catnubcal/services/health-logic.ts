@@ -34,3 +34,4 @@ export const determinePetState = (caloriesEaten: number, target: number, average
   }
   return PetState.NORMAL;
 };
+

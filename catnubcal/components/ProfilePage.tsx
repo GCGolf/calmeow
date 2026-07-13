@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, LogOut, User, Ruler, Weight, Calendar, Activity, Target, Flame, TrendingDown, TrendingUp, Heart, Dumbbell } from 'lucide-react';
+import { ChevronLeft, LogOut, Settings, User, Ruler, Weight, Calendar, Activity, Target, Flame, TrendingDown, TrendingUp, Heart, Dumbbell } from 'lucide-react';
 import { useAuth } from '../services/AuthContext';
 import { supabase } from '../services/supabaseClient';
 
@@ -32,6 +32,7 @@ const ProfilePage: React.FC = () => {
     useEffect(() => {
         const fetchProfile = async () => {
             if (!user) return;
+            let hasData = false;
             try {
                 const { data, error } = await supabase
                     .from('profiles')
@@ -41,6 +42,7 @@ const ProfilePage: React.FC = () => {
 
                 if (error) throw error;
                 if (data) {
+                    hasData = true;
                     setProfile({
                         display_name: data.display_name || data.username || 'Anonymous User',
                         weight: data.weight || data.current_weight || 0,
@@ -77,7 +79,7 @@ const ProfilePage: React.FC = () => {
                             tdee: prev?.tdee || offlineData.tdee || 0,
                             bmr: prev?.bmr || offlineData.bmr || 0,
                             target_weight: prev?.target_weight || offlineData.target_weight || 0,
-                            goal_type: prev?.goal_type || offlineData.goal_type || 'maintain',
+                            goal_type: prev?.goal_type || offlineData.goal_type || offlineData.primary_goal || 'maintain',
                             target_end_date: prev?.target_end_date || offlineData.target_end_date || '',
                             daily_calorie_target: prev?.daily_calorie_target || offlineData.daily_calorie_target || offlineData.tdee || 0,
                             protein_target: prev?.protein_target || offlineData.protein_target || 0,
@@ -85,16 +87,22 @@ const ProfilePage: React.FC = () => {
                             fat_target: prev?.fat_target || offlineData.fat_target || 0,
                             created_at: prev?.created_at || offlineData.created_at || ''
                         } as UserProfile));
+                        hasData = true;
                     } catch (e) {
                         console.error("Error parsing offline profile", e);
                     }
+                }
+                
+                if (!hasData) {
+                    navigate('/onboarding');
+                    return;
                 }
                 setLoading(false);
             }
         };
 
         fetchProfile();
-    }, [user]);
+    }, [user, navigate]);
 
     const handleSignOut = async () => {
         await signOut();
@@ -145,7 +153,16 @@ const ProfilePage: React.FC = () => {
                     <ChevronLeft className="w-5 h-5" />
                 </button>
                 <h1 className="text-xl font-black text-slate-800">โปรไฟล์ของฉัน</h1>
-                <div className="w-10" />
+                <button
+                    onClick={() => {
+                        if (window.confirm("คุณต้องการกลับไปแก้ไขข้อมูลส่วนตัวใหม่ทั้งหมดใช่หรือไม่?")) {
+                            navigate('/onboarding');
+                        }
+                    }}
+                    className="w-10 h-10 bg-white/40 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/60 text-slate-600 shadow-sm hover:bg-white/60 transition-all"
+                >
+                    <Settings className="w-5 h-5" />
+                </button>
             </header>
 
             <div className="px-6 space-y-6 pt-4">

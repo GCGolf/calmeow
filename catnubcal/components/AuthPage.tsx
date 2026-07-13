@@ -50,8 +50,9 @@ const AuthPage: React.FC = () => {
                 if (error) {
                     setError(error.message || 'สมัครสมาชิกไม่สำเร็จ');
                 } else {
+                    localStorage.setItem('isNewUser', 'true');
                     setMessage('สมัครสมาชิกสำเร็จ! กำลังนำคุณเข้าสู่ระบบ...');
-                    // After signup, auto-login and go to onboarding
+                    // Redirect is handled by PublicRoute, but we can keep setTimeout as fallback
                     setTimeout(() => {
                         navigate('/onboarding');
                     }, 1500);
