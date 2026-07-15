@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, LogOut, Settings, User, Ruler, Weight, Calendar, Activity, Target, Flame, TrendingDown, TrendingUp, Heart, Dumbbell } from 'lucide-react';
+import { ChevronLeft, LogOut, Settings, Target, TrendingDown, TrendingUp } from 'lucide-react';
 import { useAuth } from '../services/AuthContext';
 import { supabase } from '../services/supabaseClient';
+import { calculateMacros, calculateDaysToGoal } from '../services/health-logic';
 
 interface UserProfile {
     display_name: string;
@@ -28,6 +29,8 @@ const ProfilePage: React.FC = () => {
     const navigate = useNavigate();
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
+    const [planType, setPlanType] = useState<'balanced' | 'actual'>('balanced');
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -102,11 +105,87 @@ const ProfilePage: React.FC = () => {
         };
 
         fetchProfile();
-    }, [user, navigate]);
+    }, [user?.id, navigate]);
 
     const handleSignOut = async () => {
         await signOut();
         navigate('/auth');
+    };
+
+    const isUnderBmr = profile ? (profile.tdee - 550 < profile.bmr) : false;
+
+    const planDetails = React.useMemo(() => {
+        if (!profile) return null;
+        
+        // Base deficit
+        let targetCalories = profile.tdee - 550;
+        let warningMsg = '';
+
+        if (planType === 'balanced') {
+            if (targetCalories < profile.bmr) {
+                targetCalories = profile.bmr; // BMR Floor
+            }
+        } else {
+            if (targetCalories < profile.bmr) {
+                warningMsg = '⚠️ ควรกินมากกว่า BMR เพื่อสุขภาพที่ปลอดภัยในระยะยาว';
+            }
+        }
+
+        // Clinical Hard Limit
+        const safetyFloor = profile.gender.toLowerCase() === 'female' ? 1200 : 1500;
+        if (targetCalories < safetyFloor) {
+            targetCalories = safetyFloor;
+        }
+
+        targetCalories = Math.round(targetCalories);
+
+        // Macros & Projection
+        const macros = calculateMacros(targetCalories, profile.goal_type);
+        const daysToGoal = calculateDaysToGoal(profile.weight, profile.target_weight, targetCalories, profile.tdee, profile.created_at);
+
+        return {
+            targetCalories,
+            protein: macros.protein,
+            carbs: macros.carbs,
+            fat: macros.fat,
+            warningMsg,
+            daysToGoal
+        };
+    }, [profile, planType]);
+
+    const handleSavePlan = async () => {
+        if (!user || !profile || !planDetails) return;
+        setIsSaving(true);
+        try {
+            const updates = {
+                daily_calorie_target: planDetails.targetCalories,
+                protein_target: planDetails.protein,
+                carbs_target: planDetails.carbs,
+                fat_target: planDetails.fat
+            };
+            
+            const { error } = await supabase
+                .from('profiles')
+                .update(updates)
+                .eq('id', user.id);
+            
+            if (error) throw error;
+            
+            setProfile(prev => prev ? { ...prev, ...updates } : null);
+            
+            const offlineDataStr = localStorage.getItem('offline_profile');
+            if (offlineDataStr) {
+                const offlineData = JSON.parse(offlineDataStr);
+                localStorage.setItem('offline_profile', JSON.stringify({ ...offlineData, ...updates }));
+            }
+            
+            alert('บันทึกแผนเรียบร้อยแล้ว!');
+        } catch (error) {
+            console.error('Error saving plan:', error);
+            alert('เกิดข้อผิดพลาดในการบันทึกแผน');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const getActivityLabel = (level: string) => {
@@ -122,11 +201,11 @@ const ProfilePage: React.FC = () => {
 
     const getGoalLabel = (goal: string) => {
         const labels: { [key: string]: { text: string; icon: React.ReactNode; color: string } } = {
-            'lose': { text: 'ลดน้ำหนัก', icon: <TrendingDown className="w-5 h-5" />, color: 'text-green-600 bg-green-50' },
-            'maintain': { text: 'รักษาน้ำหนัก', icon: <Target className="w-5 h-5" />, color: 'text-blue-600 bg-blue-50' },
-            'gain': { text: 'เพิ่มน้ำหนัก', icon: <TrendingUp className="w-5 h-5" />, color: 'text-orange-600 bg-orange-50' }
+            'lose': { text: 'ลดน้ำหนัก', icon: <TrendingDown className="w-5 h-5" />, color: 'text-green-600 bg-green-50/50' },
+            'maintain': { text: 'รักษาน้ำหนัก', icon: <Target className="w-5 h-5" />, color: 'text-blue-600 bg-blue-50/50' },
+            'gain': { text: 'เพิ่มน้ำหนัก', icon: <TrendingUp className="w-5 h-5" />, color: 'text-orange-600 bg-orange-50/50' }
         };
-        return labels[goal] || { text: goal, icon: <Target className="w-5 h-5" />, color: 'text-slate-600 bg-slate-50' };
+        return labels[goal] || { text: goal, icon: <Target className="w-5 h-5" />, color: 'text-slate-600 bg-slate-50/50' };
     };
 
     if (loading) {
@@ -179,7 +258,7 @@ const ProfilePage: React.FC = () => {
                 {/* Goal Section - Glass */}
                 <div className="space-y-3">
                     <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest px-2">🎯 เป้าหมายของฉัน</h3>
-                    <div className={`p-5 rounded-[2rem] border border-white/50 backdrop-blur-md flex items-center gap-4 ${goalInfo.color.replace('bg-', 'bg-').replace('50', '50/50')}`}>
+                    <div className={`p-5 rounded-[2rem] border border-white/50 backdrop-blur-md flex items-center gap-4 ${goalInfo.color}`}>
                         <div className="w-12 h-12 rounded-2xl bg-white/60 flex items-center justify-center border border-white/40">
                             {goalInfo.icon}
                         </div>
@@ -242,37 +321,87 @@ const ProfilePage: React.FC = () => {
 
                 {/* Daily Targets - Glass */}
                 <div className="space-y-3">
-                    <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest px-2">🍽️ เป้าหมายรายวัน</h3>
+                    <div className="flex items-center justify-between px-2">
+                        <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">🍽️ เป้าหมายรายวัน</h3>
+                        
+                        {isUnderBmr && (
+                            <div className="flex bg-slate-200/50 p-1 rounded-full backdrop-blur-sm">
+                                <button 
+                                    onClick={() => setPlanType('balanced')}
+                                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${planType === 'balanced' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    แผนสมดุล
+                                </button>
+                                <button 
+                                    onClick={() => setPlanType('actual')}
+                                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${planType === 'actual' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    แผนตามจริง
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {planDetails?.warningMsg && (
+                        <div className="bg-orange-100/80 border border-orange-200 p-3 rounded-2xl flex items-start gap-2">
+                            <span className="text-orange-500 mt-0.5">⚠️</span>
+                            <p className="text-xs font-semibold text-orange-700 leading-snug">
+                                {planDetails.warningMsg}
+                            </p>
+                        </div>
+                    )}
+                    
+                    
+
                     <div className="bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white/60 shadow-sm divide-y divide-white/40">
                         <div className="flex items-center justify-between p-4">
                             <div className="flex items-center gap-3">
                                 <span className="text-xl">🔥</span>
                                 <span className="text-sm font-semibold text-slate-600">แคลอรี่เป้าหมาย</span>
                             </div>
-                            <span className="text-base font-black text-orange-600">{Math.round(profile?.daily_calorie_target || 0)} kcal</span>
+                            <span className="text-base font-black text-orange-600">{planDetails?.targetCalories || 0} kcal</span>
                         </div>
                         <div className="flex items-center justify-between p-4">
                             <div className="flex items-center gap-3">
                                 <span className="text-xl">🥩</span>
                                 <span className="text-sm font-semibold text-slate-600">โปรตีน</span>
                             </div>
-                            <span className="text-base font-black text-cyan-600">{Math.round(profile?.protein_target || 0)} g</span>
+                            <span className="text-base font-black text-cyan-600">{planDetails?.protein || 0} g</span>
                         </div>
                         <div className="flex items-center justify-between p-4">
                             <div className="flex items-center gap-3">
                                 <span className="text-xl">🌾</span>
                                 <span className="text-sm font-semibold text-slate-600">คาร์โบไฮเดรต</span>
                             </div>
-                            <span className="text-base font-black text-amber-600">{Math.round(profile?.carbs_target || 0)} g</span>
+                            <span className="text-base font-black text-amber-600">{planDetails?.carbs || 0} g</span>
                         </div>
                         <div className="flex items-center justify-between p-4">
                             <div className="flex items-center gap-3">
                                 <span className="text-xl">💧</span>
                                 <span className="text-sm font-semibold text-slate-600">ไขมัน</span>
                             </div>
-                            <span className="text-base font-black text-lime-600">{Math.round(profile?.fat_target || 0)} g</span>
+                            <span className="text-base font-black text-lime-600">{planDetails?.fat || 0} g</span>
                         </div>
+                        {planDetails?.daysToGoal && (
+                            <div className="flex items-center justify-between p-4 bg-purple-50/50">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-xl">⏳</span>
+                                    <span className="text-sm font-semibold text-slate-600">ระยะเวลาสำเร็จ</span>
+                                </div>
+                                <span className="text-base font-black text-purple-600">{planDetails.daysToGoal}</span>
+                            </div>
+                        )}
                     </div>
+                    
+                    {isUnderBmr && (
+                        <button
+                            onClick={handleSavePlan}
+                            disabled={isSaving}
+                            className="w-full mt-2 bg-gradient-to-r from-orange-400 to-pink-500 text-white p-3 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-md active:scale-[0.98] transition-all disabled:opacity-70"
+                        >
+                            {isSaving ? 'กำลังบันทึก...' : '💾 บันทึกแผนนี้'}
+                        </button>
+                    )}
                 </div>
 
                 {/* Sign Out */}

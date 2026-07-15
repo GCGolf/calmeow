@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../services/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/AuthContext';
-import { ChevronRight, ChevronLeft, Calendar as CalendarIcon, Check } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import { calculateBMR, calculateTDEE, calculateMacros, normalizeGoalType, normalizeActivityLevel } from '../services/health-logic';
 
 // --- Types ---
 interface OnboardingData {
@@ -104,27 +105,29 @@ export default function OnboardingWizard() {
             return;
         }
 
+        if (data.age < 18) {
+            window.alert("แอปพลิเคชันนี้ออกแบบมาสำหรับผู้ใหญ่ที่มีอายุ 18 ปีขึ้นไป การจำกัดแคลอรีในวัยเด็กอาจส่งผลเสียต่อพัฒนาการ กรุณาปรึกษาแพทย์หรือนักกำหนดอาหาร");
+            return;
+        }
+
         // --- 2. BMR Calculation (Mifflin-St Jeor) ---
         const weightKg = data.weightUnit === 'lbs' ? data.weight * 0.453592 : data.weight;
         const heightCm = data.heightUnit === 'ft' ? data.height * 30.48 : data.height;
         const targetWeightKg = data.weightUnit === 'lbs' ? data.targetWeight * 0.453592 : data.targetWeight;
 
-        let bmr = 0;
-        if (data.gender === 'Male') {
-            bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * data.age) + 5;
-        } else {
-            bmr = (10 * weightKg) + (6.25 * heightCm) - (5 * data.age) - 161;
+        const heightM = heightCm / 100;
+        const bmi = weightKg / (heightM * heightM);
+
+        if (bmi < 18.5 && data.primaryGoal === 'Lose Weight') {
+            window.alert("ดัชนีมวลกาย (BMI) ของคุณต่ำกว่าเกณฑ์ (Underweight) การลดน้ำหนักเพิ่มเติมอาจเป็นอันตรายต่อสุขภาพ กรุณาเลือกเป้าหมายรักษาน้ำหนักหรือเพิ่มกล้ามเนื้อ");
+            return;
         }
 
+        const bmr = calculateBMR(data.gender, data.age, weightKg, heightCm);
+
         // --- 3. TDEE Calculation ---
-        const activityMultipliers: { [key: string]: number } = {
-            'Sedentary': 1.2,
-            'Lightly Active': 1.375,
-            'Moderate': 1.55,
-            'Very Active': 1.725
-        };
-        const multiplier = activityMultipliers[data.activityLevel] || 1.2;
-        const tdee = bmr * multiplier;
+        const durationInt = parseInt(data.workoutDuration) || 30;
+        const tdee = calculateTDEE(bmr, data.activityLevel, data.workoutFrequency, durationInt);
 
         // --- 4. REVERSE CALCULATION: Deficit/Surplus from Target Date ---
         const totalWeightChange = Math.abs(weightKg - targetWeightKg); // kg to change
@@ -153,30 +156,30 @@ export default function OnboardingWizard() {
 
             if (data.primaryGoal === 'Lose Weight') {
                 if (requiredDailyChange > MAX_DEFICIT) {
-                    // Date is too aggressive - WARN but ALLOW (per user request)
+                    // Date is too aggressive - WARN and HARD BLOCK max deficit
                     const safeDays = Math.ceil(totalCaloriesNeeded / MAX_DEFICIT);
                     const safeDate = new Date(today);
                     safeDate.setDate(safeDate.getDate() + safeDays);
                     const safeDateString = safeDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
 
-                    dailyAdjustment = -requiredDailyChange; // Allow aggressive deficit
-                    calculatedEndDate = targetDateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
-                    validationMessage = `⚠️ เป้าหมายโหดมาก! (ลด >1kg/สัปดาห์)\n📅 วันที่ปลอดภัยที่แนะนำคือ: ${safeDateString}`;
+                    dailyAdjustment = -MAX_DEFICIT; // HARD CAP
+                    calculatedEndDate = safeDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+                    validationMessage = `⚠️ เป้าหมายโหดเกินไป! (จำกัดการลดสูงสุด 1kg/สัปดาห์ เพื่อความปลอดภัย)\n📅 วันที่คาดว่าจะสำเร็จ: ${safeDateString}`;
                 } else {
                     dailyAdjustment = -requiredDailyChange;
                     calculatedEndDate = targetDateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
                 }
             } else if (data.primaryGoal === 'Gain Muscle') {
                 if (requiredDailyChange > MAX_SURPLUS) {
-                    // Date is too aggressive - WARN but ALLOW
+                    // Date is too aggressive - WARN and HARD BLOCK max surplus
                     const safeDays = Math.ceil(totalCaloriesNeeded / MAX_SURPLUS);
                     const safeDate = new Date(today);
                     safeDate.setDate(safeDate.getDate() + safeDays);
                     const safeDateString = safeDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
 
-                    dailyAdjustment = requiredDailyChange; // Allow aggressive surplus
-                    calculatedEndDate = targetDateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
-                    validationMessage = `⚠️ เป้าหมายท้าทายมาก! (เพิ่ม >0.5kg/สัปดาห์)\n📅 วันที่ปลอดภัยที่แนะนำคือ: ${safeDateString}`;
+                    dailyAdjustment = MAX_SURPLUS; // HARD CAP
+                    calculatedEndDate = safeDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+                    validationMessage = `⚠️ เป้าหมายท้าทายเกินไป! (จำกัดการเพิ่มสูงสุด 0.5kg/สัปดาห์)\n📅 วันที่คาดว่าจะสำเร็จ: ${safeDateString}`;
                 } else {
                     dailyAdjustment = requiredDailyChange;
                     calculatedEndDate = targetDateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -205,16 +208,7 @@ export default function OnboardingWizard() {
         }
 
         // --- 6. Macro Calculation ---
-        let pSplit = 0.30, fSplit = 0.30, cSplit = 0.40;
-        if (data.primaryGoal === 'Lose Weight') {
-            pSplit = 0.40; fSplit = 0.30; cSplit = 0.30;
-        } else if (data.primaryGoal === 'Gain Muscle') {
-            pSplit = 0.30; fSplit = 0.25; cSplit = 0.45;
-        }
-
-        const protein = Math.round((dailyTarget * pSplit) / 4);
-        const carbs = Math.round((dailyTarget * cSplit) / 4);
-        const fat = Math.round((dailyTarget * fSplit) / 9);
+        const macros = calculateMacros(dailyTarget, data.primaryGoal);
 
         // Calculate Recommended Safe Date (for reference)
         const calcSafeDate = (maxRate: number) => {
@@ -248,9 +242,9 @@ export default function OnboardingWizard() {
             bmr: Math.round(bmr),
             tdee: Math.round(tdee),
             dailyCalories: dailyTarget,
-            protein: protein,
-            carbs: carbs,
-            fat: fat,
+            protein: macros.protein,
+            carbs: macros.carbs,
+            fat: macros.fat,
             estimatedCompletionDate: calculatedEndDate,
             warningMessage: validationMessage,
             recommendedSafeDate: safeDateStr,
@@ -280,9 +274,9 @@ export default function OnboardingWizard() {
                 height: data.height,
                 current_weight: data.weight, // MAPPED
                 target_weight: data.targetWeight, // MAPPED
-                primary_goal: data.primaryGoal, // MAPPED
+                primary_goal: normalizeGoalType(data.primaryGoal), // NORMALIZED
                 motivation: data.motivation,
-                activity_level: data.activityLevel, // MAPPED
+                activity_level: normalizeActivityLevel(data.activityLevel), // NORMALIZED
                 workout_days_per_week: data.workoutFrequency, // MAPPED
                 workout_duration_min: durationInt, // MAPPED
                 program_intensity: data.programIntensity, // MAPPED
@@ -303,23 +297,15 @@ export default function OnboardingWizard() {
             if (error) {
                 console.error("Error saving profile:", error);
 
-                // FALLBACK: Save to LocalStorage for Offline Mode
-                localStorage.setItem('offline_profile', JSON.stringify(dataToSave));
-
                 // If it's the RLS error (42501), warn but proceed
                 if (error.code === '42501' || error.message.includes('row-level security')) {
                     alert("Database locked (RLS Policy). Saved to Offline Storage.");
-                    navigate('/dashboard');
+                } else if (!confirm("Database Error: " + error.message + "\n\nContinue to Dashboard anyway?")) {
                     return;
                 }
-
-                if (confirm("Database Error: " + error.message + "\n\nContinue to Dashboard anyway?")) {
-                    navigate('/dashboard');
-                }
-                return;
             }
 
-            // Success - still cache offline just in case
+            // Always save to offline storage as fallback/cache
             localStorage.setItem('offline_profile', JSON.stringify(dataToSave));
             navigate('/dashboard');
         } catch (e: any) {
@@ -636,12 +622,13 @@ function renderStep(step: number, data: OnboardingData, update: (k: keyof Onboar
                 <div className="space-y-6">
                     <h2 className="text-2xl font-bold">Activity Level</h2>
                     <p className="text-xs text-purple-500 mt-1 font-medium">* ใช้คำนวณการเผาผลาญต่อวัน (TDEE)</p>
+                    <p className="text-sm text-slate-500">ประเมินแค่การขยับตัวในชีวิตประจำวันหรือการทำงานเท่านั้น (ไม่รวมออกกำลังกาย)</p>
                     <div className="space-y-3">
                         {[
-                            { l: 'Sedentary', d: 'Little to no exercise' },
-                            { l: 'Lightly Active', d: '1-3 days/week' },
-                            { l: 'Moderate', d: '3-5 days/week' },
-                            { l: 'Very Active', d: '6-7 days/week' }
+                            { l: 'Sedentary', d: 'เน้นนั่งทำงานออฟฟิศเป็นหลัก ไม่ค่อยได้เดิน (Desk job)' },
+                            { l: 'Lightly Active', d: 'มีการยืนหรือเดินบ้างระหว่างวัน (เช่น ครู, พนักงานขาย)' },
+                            { l: 'Moderate', d: 'ต้องเดินตลอดเวลา หรือใช้แรงปานกลาง (เช่น พนักงานเสิร์ฟ, พยาบาล)' },
+                            { l: 'Very Active', d: 'ทำงานใช้แรงงานหนัก หรือแบกหาม (เช่น ช่างก่อสร้าง, เกษตรกร)' }
                         ].map(opt => (
                             <button
                                 key={opt.l}
@@ -655,6 +642,15 @@ function renderStep(step: number, data: OnboardingData, update: (k: keyof Onboar
                                 <p className="text-sm text-slate-500">{opt.d}</p>
                             </button>
                         ))}
+                    </div>
+                    <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-700">
+                        <b>💡 ตัวคูณพื้นฐาน (Base Lifestyle Multiplier):</b>
+                        <ul className="list-disc pl-5 mt-1 space-y-1">
+                            <li>Sedentary = 1.2</li>
+                            <li>Lightly Active = 1.3</li>
+                            <li>Moderate = 1.4</li>
+                            <li>Very Active = 1.5</li>
+                        </ul>
                     </div>
                 </div>
             );
@@ -672,6 +668,10 @@ function renderStep(step: number, data: OnboardingData, update: (k: keyof Onboar
                         onChange={(e) => update('workoutFrequency', parseInt(e.target.value))}
                         className="w-full accent-purple-600 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                     />
+                    <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-700">
+                        <b>💡 โบนัสออกกำลังกาย (Exercise Bonus Multiplier):</b>
+                        <p className="mt-1">ระบบจะนำ ความถี่ x ระยะเวลา = นาทีรวมต่อสัปดาห์ เพื่อหาโบนัสที่นำไปบวกเพิ่ม</p>
+                    </div>
                 </div>
             );
         case 12:
@@ -682,6 +682,17 @@ function renderStep(step: number, data: OnboardingData, update: (k: keyof Onboar
                         {['15m', '30m', '45m', '60m+'].map(t => (
                             <KeyOption key={t} label={t} selected={data.workoutDuration === t} onClick={() => update('workoutDuration', t)} />
                         ))}
+                    </div>
+                    <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-700">
+                        <b>💡 โบนัสออกกำลังกาย (Exercise Bonus Multiplier):</b>
+                        <p className="mt-1">ความถี่ ({data.workoutFrequency} วัน) x ระยะเวลา = นาทีรวมต่อสัปดาห์</p>
+                        <ul className="list-disc pl-5 mt-2 space-y-1">
+                            <li>0 นาที ➔ โบนัส +0.0</li>
+                            <li>1 - 60 นาที ➔ โบนัส +0.05</li>
+                            <li>61 - 150 นาที ➔ โบนัส +0.15</li>
+                            <li>151 - 250 นาที ➔ โบนัส +0.25</li>
+                            <li>&gt; 250 นาที ➔ โบนัส +0.35</li>
+                        </ul>
                     </div>
                 </div>
             );
