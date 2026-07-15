@@ -180,6 +180,16 @@ const Dashboard: React.FC = () => {
 
 
 
+    // Update Alert State
+    const [showUpdateAlert, setShowUpdateAlert] = useState(() => {
+        return localStorage.getItem('hide_update_alert_v1') !== 'true';
+    });
+
+    const dismissUpdateAlert = () => {
+        localStorage.setItem('hide_update_alert_v1', 'true');
+        setShowUpdateAlert(false);
+    };
+
     // Date Selection State - MOVED UP to fix ReferenceError
     const [selectedDate, setSelectedDate] = useState(new Date().toLocaleDateString('en-CA'));
     const [showMonthPicker, setShowMonthPicker] = useState(false); // [NEW] Month Picker Modal Toggle
@@ -1057,6 +1067,20 @@ const Dashboard: React.FC = () => {
             <main className="px-6 py-10 space-y-10">
                 {activeTab === 'dashboard' && (
                     <div className="space-y-10">
+                        {showUpdateAlert && (
+                            <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white p-4 rounded-[2rem] shadow-lg relative overflow-hidden flex items-start gap-3">
+                                <div className="text-2xl mt-1">⚠️</div>
+                                <div className="flex-1 pr-6">
+                                    <h4 className="font-bold text-sm mb-1">มีการอัปเดตระบบคำนวณแคลอรี่ใหม่!</h4>
+                                    <p className="text-xs text-white/90 leading-relaxed">
+                                        เพื่อความแม่นยำยิ่งขึ้น โปรดไปที่หน้า <button onClick={() => navigate('/profile')} className="underline font-bold text-white hover:text-purple-100">โปรไฟล์</button> ของคุณแล้วตั้งค่าและบันทึกแผนใหม่อีกครั้ง
+                                    </p>
+                                </div>
+                                <button onClick={dismissUpdateAlert} className="absolute top-3 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-black/10 hover:bg-black/20 text-white transition-all">
+                                    ✕
+                                </button>
+                            </div>
+                        )}
                         <PetSmartWalk
                             currentCalories={currentDayStats.calories}
                             goalCalories={userStats.tdee}
