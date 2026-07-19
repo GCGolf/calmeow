@@ -47,6 +47,43 @@ const FavoriteMenuModal: React.FC<FavoriteMenuModalProps> = ({ isOpen, onClose, 
 
     const handleRemoveFavorite = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
+        const targetFood = favorites.find(f => f.id === id);
+
+        // [NEW] Step 1: Extract & Delete File from Storage
+        if (targetFood?.image_url?.includes('supabase.co/storage/v1/object/public/food-images/')) {
+            try {
+                // Check if this image is being used in food_logs
+                const { data: foodLogUsingImage } = await supabase
+                    .from('food_logs')
+                    .select('id')
+                    .eq('image_url', targetFood.image_url)
+                    .limit(1);
+
+                const isImageInUseByFoodLog = foodLogUsingImage && foodLogUsingImage.length > 0;
+
+                if (!isImageInUseByFoodLog) {
+                    const urlParts = targetFood.image_url.split('/public/food-images/');
+                    if (urlParts.length === 2) {
+                        const filePath = urlParts[1];
+                        const { error: storageError } = await supabase.storage
+                            .from('food-images')
+                            .remove([filePath]);
+                        
+                        if (storageError) {
+                            console.error("Storage delete failed:", storageError);
+                        } else {
+                            console.log("Image deleted from storage:", filePath);
+                        }
+                    }
+                } else {
+                    console.log("Image skipped deletion because it is in use by food_logs");
+                }
+            } catch (err) {
+                console.error("Error deleting image from storage:", err);
+            }
+        }
+
+        // Step 2: Delete Record from Database
         const { error } = await supabase.from('favorite_foods').delete().eq('id', id);
         if (!error) {
             setFavorites(prev => prev.filter(f => f.id !== id));

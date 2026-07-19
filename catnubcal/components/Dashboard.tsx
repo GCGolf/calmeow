@@ -1019,9 +1019,45 @@ const Dashboard: React.FC = () => {
     // Delete Food Item from Database/Offline Storage
     const handleDeleteFood = async (foodId: string) => {
         const userId = user?.id;
+        const targetFood = foodLog.find(f => f.id === foodId);
 
         // Try to delete from Supabase
         if (userId) {
+            // [NEW] Step 1: Extract & Delete File from Storage
+            if (targetFood?.imageUrl?.includes('supabase.co/storage/v1/object/public/food-images/')) {
+                try {
+                    // Check if this image is being used in favorite_foods
+                    const { data: favoriteUsingImage } = await supabase
+                        .from('favorite_foods')
+                        .select('id')
+                        .eq('image_url', targetFood.imageUrl)
+                        .limit(1);
+
+                    const isImageInUseByFavorite = favoriteUsingImage && favoriteUsingImage.length > 0;
+
+                    if (!isImageInUseByFavorite) {
+                        const urlParts = targetFood.imageUrl.split('/public/food-images/');
+                        if (urlParts.length === 2) {
+                            const filePath = urlParts[1];
+                            const { error: storageError } = await supabase.storage
+                                .from('food-images')
+                                .remove([filePath]);
+                            
+                            if (storageError) {
+                                console.error("Storage delete failed:", storageError);
+                            } else {
+                                console.log("Image deleted from storage:", filePath);
+                            }
+                        }
+                    } else {
+                        console.log("Image skipped deletion because it is in use by favorite_foods");
+                    }
+                } catch (err) {
+                    console.error("Error deleting image from storage:", err);
+                }
+            }
+
+            // Step 2: Delete Record from Database
             const { error } = await supabase
                 .from('food_logs')
                 .delete()
