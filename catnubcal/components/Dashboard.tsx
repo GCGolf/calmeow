@@ -40,8 +40,9 @@ import { supabase } from '../services/supabaseClient';
 import { useAuth } from '../services/AuthContext';
 import FavoriteMenuModal from './FavoriteMenuModal';
 
-// Helper to compress image before converting to base64
-const compressImageBase64 = (file: File): Promise<string> => {
+// [UPDATED] Helper to compress image to WebP Blob (Phase 2+3: Supabase Storage)
+// Returns a Blob (not Base64) for uploading directly to Storage Bucket
+const compressImageToBlob = (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
@@ -50,8 +51,8 @@ const compressImageBase64 = (file: File): Promise<string> => {
             img.src = event.target?.result as string;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 400; // Limit width to 400px (thumbnail size)
-                const MAX_HEIGHT = 400; // Limit height to 400px
+                const MAX_WIDTH = 400;
+                const MAX_HEIGHT = 400;
                 let width = img.width;
                 let height = img.height;
 
@@ -71,13 +72,79 @@ const compressImageBase64 = (file: File): Promise<string> => {
                 canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 ctx?.drawImage(img, 0, 0, width, height);
-                // Compress to JPEG with 0.6 quality
+                // Compress to WebP (smaller & better quality than JPEG at same size)
+                canvas.toBlob(
+                    (blob) => {
+                        if (blob) resolve(blob);
+                        else reject(new Error('Canvas toBlob failed'));
+                    },
+                    'image/webp',
+                    0.75
+                );
+            };
+            img.onerror = reject;
+        };
+        reader.onerror = reject;
+    });
+};
+
+// [NEW] Helper to also get Base64 preview quickly (for local preview only, NOT stored in DB)
+const compressImageBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 400;
+                const MAX_HEIGHT = 400;
+                let width = img.width;
+                let height = img.height;
+                if (width > height) {
+                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                } else {
+                    if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
                 resolve(canvas.toDataURL('image/jpeg', 0.6));
             };
             img.onerror = reject;
         };
         reader.onerror = reject;
     });
+};
+
+// [NEW] Upload a Blob to Supabase Storage and return the public URL
+// Stored as: food-images/{userId}/{timestamp}.webp
+const uploadImageToStorage = async (blob: Blob, userId: string): Promise<string | null> => {
+    try {
+        const fileName = `${userId}/${Date.now()}.webp`;
+        const { data, error } = await supabase.storage
+            .from('food-images')
+            .upload(fileName, blob, {
+                contentType: 'image/webp',
+                upsert: false,
+            });
+
+        if (error) {
+            console.error('Storage upload error:', error);
+            return null;
+        }
+
+        const { data: urlData } = supabase.storage
+            .from('food-images')
+            .getPublicUrl(data.path);
+
+        return urlData.publicUrl;
+    } catch (err) {
+        console.error('uploadImageToStorage failed:', err);
+        return null;
+    }
 };
 
 const Dashboard: React.FC = () => {
@@ -155,6 +222,19 @@ const Dashboard: React.FC = () => {
                 alert('บันทึกสำเร็จ!');
             } else {
                 // Add to favorites
+                // [UPDATED] If imageUrl is Base64, re-upload to Storage to avoid bloating favorite_foods table
+                let favoriteImageUrl: string | null | undefined = selectedFood.imageUrl;
+                if (favoriteImageUrl && favoriteImageUrl.startsWith('data:image')) {
+                    try {
+                        const res = await fetch(favoriteImageUrl);
+                        const blob = await res.blob();
+                        const uploaded = await uploadImageToStorage(blob, user.id);
+                        if (uploaded) favoriteImageUrl = uploaded;
+                    } catch {
+                        // Keep Base64 as fallback if re-upload fails
+                    }
+                }
+
                 const { data, error } = await supabase
                     .from('favorite_foods')
                     .insert([{
@@ -164,7 +244,7 @@ const Dashboard: React.FC = () => {
                         protein: selectedFood.protein,
                         carbs: selectedFood.carbs,
                         fat: selectedFood.fat,
-                        image_url: selectedFood.imageUrl
+                        image_url: favoriteImageUrl
                     }])
                     .select()
                     .single();
@@ -573,12 +653,24 @@ const Dashboard: React.FC = () => {
 
         setIsScanning(true);
         try {
-            // Compress and wait for image to be read
-            const capturedImage = await compressImageBase64(file);
-            setPreviewImage(capturedImage); // Show preview
+            // [UPDATED] Compress to WebP Blob + also get Base64 for local preview
+            const [imageBlob, previewBase64] = await Promise.all([
+                compressImageToBlob(file),
+                compressImageBase64(file),
+            ]);
+            setPreviewImage(previewBase64); // Local preview only (Base64 stays in memory, NOT in DB)
 
             const result = await analyzeFoodImage(file);
             const userId = user?.id;
+
+            // [UPDATED] Upload to Supabase Storage — store URL only (not Base64)
+            let imageStorageUrl: string | null = null;
+            if (userId) {
+                imageStorageUrl = await uploadImageToStorage(imageBlob, userId);
+            }
+
+            // Fallback: if Storage upload failed, use Base64 (backward compat)
+            const imageToSave = imageStorageUrl ?? previewBase64;
 
             // Use selected date
             const logDate = new Date(selectedDate);
@@ -596,7 +688,7 @@ const Dashboard: React.FC = () => {
                     sugar: Math.round(result.sugar || 0),
                     sodium: Math.round(result.sodium || 0),
                     cholesterol: Math.round(result.cholesterol || 0),
-                    image_url: capturedImage,
+                    image_url: imageToSave,  // URL from Storage (or Base64 fallback)
                     created_at: logDate.toISOString()
                 }]).select().single();
 
@@ -614,7 +706,7 @@ const Dashboard: React.FC = () => {
                         fat: data.fat,
                         timestamp: new Date(data.created_at).getTime(),
                         meal: 'ของว่าง',
-                        imageUrl: capturedImage,
+                        imageUrl: imageToSave,  // Show from URL or Base64 fallback
                         fiber: 0,
                         sugar: data.sugar || 0,
                         sodium: data.sodium || 0,
@@ -623,11 +715,11 @@ const Dashboard: React.FC = () => {
                     };
                     setFoodLog(prev => [...prev, newFood]);
                     setSelectedFood(newFood);
-                    setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
+                    setFeedTrigger(prev => prev + 1);
                 }
             }
             setShowAddModal(false);
-            setPreviewImage(null); // Clear preview after success
+            setPreviewImage(null);
         } catch (err: any) {
             console.error("AI Scan DB Error:", err);
 
@@ -640,7 +732,7 @@ const Dashboard: React.FC = () => {
                 id: crypto.randomUUID(),
                 user_id: userId,
                 name: 'AI Scan Item',
-                calories: 0, // Set defaults as result might have failed too
+                calories: 0,
                 protein: 0,
                 carbs: 0,
                 fat: 0,
@@ -671,18 +763,24 @@ const Dashboard: React.FC = () => {
                 servingSize: { unit: 'portion', quantity: 1 },
             };
             setFoodLog(prev => [...prev, newFood]);
-            setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
+            setFeedTrigger(prev => prev + 1);
         } finally {
             setIsScanning(false);
         }
     };
 
+    // [UPDATED] Manual image select — store Blob ref for later upload, show Base64 preview only
+    const manualImageBlobRef = useRef<Blob | null>(null);
     const handleManualImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         try {
-            const compressed = await compressImageBase64(file);
-            setPreviewImage(compressed);
+            const [blob, preview] = await Promise.all([
+                compressImageToBlob(file),
+                compressImageBase64(file),
+            ]);
+            manualImageBlobRef.current = blob;  // Keep Blob ready for upload on submit
+            setPreviewImage(preview);           // Base64 for local preview only
         } catch (err) {
             console.error("Error compressing image:", err);
         }
@@ -699,6 +797,16 @@ const Dashboard: React.FC = () => {
         const logDate = new Date(selectedDate);
         logDate.setHours(12, 0, 0, 0);
 
+        // [UPDATED] Upload image Blob to Storage first, then save URL to DB
+        let imageStorageUrl: string | null = null;
+        if (manualImageBlobRef.current) {
+            imageStorageUrl = await uploadImageToStorage(manualImageBlobRef.current, userId);
+            manualImageBlobRef.current = null; // Clear blob ref after upload
+        }
+
+        // Fallback: if Storage upload failed, use Base64 preview (backward compat)
+        const imageToSave = imageStorageUrl ?? previewImage;
+
         const newEntry = {
             user_id: userId,
             food_name: fd.get('name') as string,
@@ -709,7 +817,7 @@ const Dashboard: React.FC = () => {
             cholesterol: Number(fd.get('cholesterol')) || 0,
             sugar: Number(fd.get('sugar')) || 0,
             sodium: Number(fd.get('sodium')) || 0,
-            image_url: previewImage,
+            image_url: imageToSave,  // URL from Storage (or Base64 fallback)
             created_at: logDate.toISOString()
         };
 
@@ -747,11 +855,10 @@ const Dashboard: React.FC = () => {
                 imageUrl: offlineEntry.image_url,
             };
             setFoodLog(prev => [...prev, newFood]);
-            setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
+            setFeedTrigger(prev => prev + 1);
             setShowAddModal(false);
             manualFormRef.current?.reset();
             setPreviewImage(null);
-            setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
             return;
         }
 
@@ -773,7 +880,7 @@ const Dashboard: React.FC = () => {
                 servingSize: { unit: 'serving', quantity: 1 }
             };
             setFoodLog(prev => [...prev, newFood]);
-            setFeedTrigger(prev => prev + 1); // [NEW] Trigger feeding animation
+            setFeedTrigger(prev => prev + 1);
         }
 
         setShowAddModal(false);
