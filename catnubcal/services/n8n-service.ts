@@ -54,7 +54,7 @@ export const analyzeFoodImage = async (file: File): Promise<Partial<FoodItem>> =
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.API_KEY}`,
+        "Authorization": `Bearer ${import.meta.env.VITE_API_KEY}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "http://localhost:3000",
         "X-Title": "CalMeow"
@@ -177,14 +177,15 @@ export const suggestFoodByCalories = async (remainingCalories: number): Promise<
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.API_KEY}`,
+        "Authorization": `Bearer ${import.meta.env.VITE_API_KEY}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "http://localhost:3000",
         "X-Title": "CalMeow"
       },
       body: JSON.stringify({
-        model: "google/gemini-3.1-flash-lite", // Using the same model as image analysis
-        temperature: 0.9, // Increase temperature for more variety
+        model: "google/gemini-3.1-flash-lite",
+        temperature: 1.0, // Max temperature for maximum variety
+        seed: randomSeed,  // Pass seed directly in request body for true randomization
         messages: [
           {
             role: "user",
