@@ -513,19 +513,21 @@ const Dashboard: React.FC = () => {
                 // If neither, streak broken (0).
 
                 if (uniqueDays.has(todayStr)) {
+                    // Today is logged: count=1 and look back from yesterday
                     currentStreak = 1;
-                    checkDate.setDate(checkDate.getDate() - 1); // Start checking previous days
-                } else if (uniqueDays.has(yesterdayStr)) {
-                    // Streak implies consecutive days ENDING now. 
-                    // Common logic: if yesterday was logged, streak is alive.
-                    currentStreak = 0; // Will be incremented in loop below starting from yesterday
                     checkDate.setDate(checkDate.getDate() - 1);
+                } else if (uniqueDays.has(yesterdayStr)) {
+                    // Today not logged yet but yesterday was: streak still alive
+                    // Start count at 1 (for yesterday) and look back from 2 days ago
+                    currentStreak = 1;
+                    checkDate.setDate(checkDate.getDate() - 1); // checkDate = yesterday
+                    checkDate.setDate(checkDate.getDate() - 1); // checkDate = 2 days ago
                 } else {
                     setStreak(0);
                     return;
                 }
 
-                // Count backwards
+                // Count backwards from checkDate
                 while (true) {
                     const dateStr = checkDate.toLocaleDateString('en-CA');
                     if (uniqueDays.has(dateStr)) {

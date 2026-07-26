@@ -19,6 +19,7 @@ const Analytics: React.FC = () => {
   const [tdee, setTdee] = useState(2000);
   const [macros, setMacros] = useState({ protein: 0, carbs: 0, fat: 0 });
   const [rawLogs, setRawLogs] = useState<any[]>([]);
+  const [calendarLogs, setCalendarLogs] = useState<any[]>([]); // [FIX] Separate logs for ConsistencyCalendar (90 days)
   const [goalProgress, setGoalProgress] = useState({
     startDate: new Date(),
     targetDate: new Date(),
@@ -216,6 +217,30 @@ const Analytics: React.FC = () => {
     fetchStats();
   }, [user, tdee]);
 
+  // [FIX] Fetch logs for ConsistencyCalendar separately (90 days to cover multiple months)
+  useEffect(() => {
+    const fetchCalendarLogs = async () => {
+      const userId = user?.id;
+      if (!userId) return;
+
+      const calStart = new Date();
+      calStart.setDate(calStart.getDate() - 89); // 90 days back
+      calStart.setHours(0, 0, 0, 0);
+
+      const { data } = await supabase
+        .from('food_logs')
+        .select('calories, protein, carbs, fat, cholesterol, sodium, sugar, created_at')
+        .eq('user_id', userId)
+        .gte('created_at', calStart.toISOString())
+        .order('created_at', { ascending: true });
+
+      if (data) {
+        setCalendarLogs(data);
+      }
+    };
+    fetchCalendarLogs();
+  }, [user]);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       {/* Cat Goal Tracker - Real Goal Journey */}
@@ -261,7 +286,7 @@ const Analytics: React.FC = () => {
       </div>
 
       {/* Consistency Calendar - [NEW] Feature */}
-      <ConsistencyCalendar logs={rawLogs} tdee={tdee} />
+      <ConsistencyCalendar logs={calendarLogs} tdee={tdee} />
 
 
 
