@@ -483,13 +483,19 @@ const Dashboard: React.FC = () => {
         const calculateStreak = async () => {
             if (!user) return;
 
-            // Fetch recent logs to calculate streak (e.g. last 60 days)
+            // [FIX] Fetch by date range (90 days) instead of .limit(100)
+            // ปัญหาเดิม: .limit(100) นับ records ไม่ใช่วัน → user ที่บันทึกหลาย record/วัน
+            // จะสูญเสียข้อมูลวันเก่าออกไปจาก Set ทำให้ streak ขาดโดยไม่มีสาเหตุ
+            const streakRangeStart = new Date();
+            streakRangeStart.setDate(streakRangeStart.getDate() - 90); // ย้อนหลัง 90 วัน
+            streakRangeStart.setHours(0, 0, 0, 0);
+
             const { data, error } = await supabase
                 .from('food_logs')
                 .select('created_at')
                 .eq('user_id', user.id)
-                .order('created_at', { ascending: false })
-                .limit(100);
+                .gte('created_at', streakRangeStart.toISOString())
+                .order('created_at', { ascending: false });
 
             if (data) {
                 // 1. Get unique unique YYYY-MM-DD
@@ -571,7 +577,7 @@ const Dashboard: React.FC = () => {
                         carbs: item.carbs,
                         fat: item.fat,
                         timestamp: new Date(item.created_at).getTime(),
-                        meal: item.meal_type || 'Snack',
+                        meal: item.meal_type || 'มื้อหลัก',
                         imageUrl: item.image_url || undefined,
                         fiber: 0,
                         sugar: item.sugar || 0,
@@ -608,7 +614,7 @@ const Dashboard: React.FC = () => {
                     carbs: item.carbs,
                     fat: item.fat,
                     timestamp: new Date(item.created_at).getTime(),
-                    meal: item.meal_type || 'Snack',
+                    meal: item.meal_type || 'มื้อหลัก',
                     imageUrl: item.image_url || undefined,
                     fiber: 0,
                     sugar: item.sugar || 0,
@@ -707,7 +713,7 @@ const Dashboard: React.FC = () => {
                         carbs: data.carbs,
                         fat: data.fat,
                         timestamp: new Date(data.created_at).getTime(),
-                        meal: 'ของว่าง',
+                        meal: 'มื้อหลัก',
                         imageUrl: imageToSave,  // Show from URL or Base64 fallback
                         fiber: 0,
                         sugar: data.sugar || 0,
@@ -760,7 +766,7 @@ const Dashboard: React.FC = () => {
                 sugar: 0,
                 sodium: 0,
                 cholesterol: 0,
-                meal: 'ของว่าง',
+                meal: 'มื้อหลัก',
                 timestamp: new Date(offlineEntry.created_at).getTime(),
                 servingSize: { unit: 'portion', quantity: 1 },
             };
@@ -851,7 +857,7 @@ const Dashboard: React.FC = () => {
                 sugar: 0,
                 sodium: 0,
                 cholesterol: 0,
-                meal: 'ของว่าง',
+                meal: 'มื้อหลัก',
                 timestamp: new Date(offlineEntry.created_at).getTime(),
                 servingSize: { unit: 'portion', quantity: 1 },
                 imageUrl: offlineEntry.image_url,
@@ -873,7 +879,7 @@ const Dashboard: React.FC = () => {
                 carbs: data.carbs,
                 fat: data.fat,
                 timestamp: new Date(data.created_at).getTime(),
-                meal: 'ของว่าง',
+                meal: 'มื้อหลัก',
                 imageUrl: data.image_url || previewImage,
                 fiber: 0,
                 sugar: data.sugar || 0,
