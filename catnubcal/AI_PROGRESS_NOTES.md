@@ -1,3 +1,17 @@
+# AI Progress Notes (2 August 2026)
+
+## 📌 สิ่งที่ทำเสร็จแล้วในวันนี้
+1. **แก้ไขบั๊กคำนวณ Streak ถาวร (Supabase RPC Migration):**
+   - **Root Cause ที่แท้จริง**: Query แบบเดิมดึง created_at ทุก record แล้วมา Dedup ฝั่ง JavaScript แต่ Supabase PostgREST มีค่า Default Row Limit อยู่ที่ 1,000 แถวต่อ Request
+   - สำหรับผู้ใช้เก่าที่มีประวัติบันทึกหลายรายการต่อวัน (เช่น วันละ 90+ records) การดึงข้อมูล 1,000 แถวจะครอบคลุมเพียง ~11 วันล่าสุด ทำให้ Streak แสดงผลตัดขาดเหลือเพียง 11 วัน แม้จะบันทึกต่อเนื่องจริง 21 วัน
+   - **วิธีแก้**:
+     - สร้าง Supabase RPC Function `get_streak_dates(p_user_id, p_days_back)` (`supabase_streak_rpc.sql`) เพื่อทำ `SELECT DISTINCT` วันที่ในระดับ PostgreSQL Database พร้อมแปลง Timezone เป็น `Asia/Bangkok`
+     - ปรับปรุง `Dashboard.tsx` ให้เรียกผ่าน `.rpc('get_streak_dates')` ซึ่งส่งกลับไม่เกิน 90 แถว หมดปัญหาติด Row Limit 1,000 แถวอย่างถาวร
+   - **ความปลอดภัย**: ไม่กระทบข้อมูลเก่า 100%, ใช้งานร่วมกับ Supabase RLS ได้ปลอดภัย
+   - พิเศษ: ทำการ Commit และ Push โค้ดขึ้น GitHub ตามคำสั่งเฉพาะกิจของผู้ใช้
+
+---
+
 # AI Progress Notes (1 August 2026)
 
 ## 📌 สิ่งที่ทำเสร็จแล้วในวันนี้

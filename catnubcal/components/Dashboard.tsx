@@ -478,62 +478,71 @@ const Dashboard: React.FC = () => {
         fetchWaterLog();
     }, [selectedDate, user]);
 
-    // [NEW] Calculate Streak (Consecutive Active Days)
+    // [REWRITTEN v3 - Definitive Fix] Calculate Streak using Supabase RPC
+    // ============================================================
+    // ROOT CAUSE ที่แท้จริง:
+    //   Query แบบเดิมดึง created_at ทุก record → Supabase PostgREST มี default row limit
+    //   ถ้า user มีข้อมูลเยอะ (เช่น 91 entries/วัน) → return แค่ ~11 วันล่าสุด
+    //   ทำให้ Streak แสดงผิดเป็น 11 ทั้งที่ user บันทึกครบ 21 วัน
+    //
+    // FIX:
+    //   ใช้ RPC Function `get_streak_dates` ที่ทำ DISTINCT บน DB โดยตรง
+    //   ผลลัพธ์สูงสุด 90 rows (1 per วัน) → ไม่มีทางถูก row limit ตัด
+    //   พร้อม Timezone ถูกต้อง (Asia/Bangkok) ระดับ DB
+    //
+    // ก่อนใช้: รัน supabase_streak_rpc.sql ใน Supabase SQL Editor ก่อน
+    // ============================================================
     useEffect(() => {
         const calculateStreak = async () => {
             if (!user) return;
 
-            // [FIX] Fetch by date range (90 days) instead of .limit(100)
-            // ปัญหาเดิม: .limit(100) นับ records ไม่ใช่วัน → user ที่บันทึกหลาย record/วัน
-            // จะสูญเสียข้อมูลวันเก่าออกไปจาก Set ทำให้ streak ขาดโดยไม่มีสาเหตุ
-            const streakRangeStart = new Date();
-            streakRangeStart.setDate(streakRangeStart.getDate() - 90); // ย้อนหลัง 90 วัน
-            streakRangeStart.setHours(0, 0, 0, 0);
+            try {
+                // [FIX] RPC returns DISTINCT dates only (≤ 90 rows) — bypasses row limit entirely
+                const { data, error } = await supabase
+                    .rpc('get_streak_dates', {
+                        p_user_id: user.id,
+                        p_days_back: 90
+                    });
 
-            const { data, error } = await supabase
-                .from('food_logs')
-                .select('created_at')
-                .eq('user_id', user.id)
-                .gte('created_at', streakRangeStart.toISOString())
-                .order('created_at', { ascending: false });
+                if (error) {
+                    console.error('[Streak] RPC error (ต้องรัน supabase_streak_rpc.sql ก่อน):', error);
+                    setStreak(0);
+                    return;
+                }
 
-            if (data) {
-                // 1. Get unique unique YYYY-MM-DD
-                const uniqueDays = new Set(
-                    data.map(log => new Date(log.created_at).toLocaleDateString('en-CA')) // YYYY-MM-DD in local time
-                );
+                if (!data || data.length === 0) {
+                    setStreak(0);
+                    return;
+                }
 
-                // 2. Check backwards from today
+                // Build Set of unique YYYY-MM-DD strings (Bangkok timezone, from DB)
+                const uniqueDays = new Set<string>(data.map((row: any) => row.log_date as string));
+
+                // Check backwards from today (client Bangkok timezone)
                 const today = new Date();
-                const todayStr = today.toLocaleDateString('en-CA');
-
-                const yesterday = new Date();
+                const todayStr = today.toLocaleDateString('en-CA'); // YYYY-MM-DD
+                const yesterday = new Date(today);
                 yesterday.setDate(today.getDate() - 1);
                 const yesterdayStr = yesterday.toLocaleDateString('en-CA');
 
                 let currentStreak = 0;
-                let checkDate = new Date();
-
-                // If today is logged, we start counting from today. 
-                // If today NOT logged, but Yesterday IS, we start counting from Yesterday (streak active but not updated today yet).
-                // If neither, streak broken (0).
+                let checkDate = new Date(today);
 
                 if (uniqueDays.has(todayStr)) {
-                    // Today is logged: count=1 and look back from yesterday
+                    // บันทึกวันนี้แล้ว → เริ่มนับจากวันนี้
                     currentStreak = 1;
-                    checkDate.setDate(checkDate.getDate() - 1);
+                    checkDate.setDate(checkDate.getDate() - 1); // ถอยไปเมื่อวาน
                 } else if (uniqueDays.has(yesterdayStr)) {
-                    // Today not logged yet but yesterday was: streak still alive
-                    // Start count at 1 (for yesterday) and look back from 2 days ago
+                    // วันนี้ยังไม่บันทึก แต่เมื่อวานบันทึก → streak ยังมีอยู่
                     currentStreak = 1;
-                    checkDate.setDate(checkDate.getDate() - 1); // checkDate = yesterday
-                    checkDate.setDate(checkDate.getDate() - 1); // checkDate = 2 days ago
+                    checkDate = new Date(yesterday);
+                    checkDate.setDate(checkDate.getDate() - 1); // ถอยไป 2 วันก่อน
                 } else {
                     setStreak(0);
                     return;
                 }
 
-                // Count backwards from checkDate
+                // นับถอยหลังต่อเนื่อง
                 while (true) {
                     const dateStr = checkDate.toLocaleDateString('en-CA');
                     if (uniqueDays.has(dateStr)) {
@@ -543,11 +552,16 @@ const Dashboard: React.FC = () => {
                         break;
                     }
                 }
+
                 setStreak(currentStreak);
+
+            } catch (err) {
+                console.error('[Streak] Unexpected error:', err);
             }
         };
+
         calculateStreak();
-    }, [user, foodLog]); // Re-calc when foodLog updates (e.g. adding new food)
+    }, [user, foodLog]); // Re-calc เมื่อเพิ่มอาหารใหม่วันนี้
 
 
 
