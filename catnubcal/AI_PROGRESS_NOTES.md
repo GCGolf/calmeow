@@ -1,3 +1,17 @@
+# AI Progress Notes (5 August 2026)
+
+## 📌 สิ่งที่ทำเสร็จแล้วในวันนี้
+1. **แก้ไขบั๊กเป้าหมายโปรตีนและคาร์โบไฮเดรตสลับกันในหน้า Profile (Macro Goal Column Mismatch):**
+   - **Root Cause ที่แท้จริง**: `OnboardingWizard.tsx` ทำการบันทึกเป้าหมายของผู้ใช้ลงคอลัมน์ชื่อ `primary_goal` แต่ใน `ProfilePage.tsx` มีการอ่านข้อมูลจาก `data.goal_type` ซึ่งไม่มีคอลัมน์นี้ในฐานข้อมูล ทำให้ fallback ไปเป็น `'maintain'` ทุกครั้ง
+   - สำหรับผู้ใช้ที่มีเป้าหมาย "ลดน้ำหนัก" (`lose`) สูตรการคำนวณ `calculateMacros` ควรแบ่งสัดส่วนเป็น Protein 40% / Carbs 30% / Fat 30%
+   - หน้า `Dashboard` นำเป้าหมายจาก `OnboardingWizard` มาแสดงผลถูกต้อง (โปรตีน 137g, คาร์บ 103g) แต่หน้า `ProfilePage` นำเป้าหมาย `'maintain'` มาคำนวณซ้ำเป็น Protein 30% / Carbs 40% ทำให้แสดงผลสลับกันเป็น (โปรตีน 103g, คาร์บ 137g)
+   - **วิธีแก้**:
+     - ปรับปรุง [ProfilePage.tsx](file:///c:/Users/golf3/Downloads/Project%20%E0%B8%AD%E0%B8%A2%E0%B9%88%E0%B8%B2%E0%B8%99%E0%B8%B1%E0%B8%9A%E0%B9%81%E0%B8%84%E0%B8%A5%20-%20Copy/catnubcal/catnubcal/components/ProfilePage.tsx) ให้อ่านจาก `data.primary_goal || data.goal_type || 'maintain'` ทั้งในส่วนที่ดึงข้อมูลจาก Supabase และส่วน LocalStorage Offline Fallback
+     - ข้อมูลเป้าหมายทั้ง 2 หน้ากลับมาตรงกัน 100%
+   - พิเศษ: ทำการ Commit และ Push โค้ดขึ้น GitHub ตามคำสั่งเฉพาะกิจของผู้ใช้
+
+---
+
 # AI Progress Notes (2 August 2026)
 
 ## 📌 สิ่งที่ทำเสร็จแล้วในวันนี้
